@@ -43,7 +43,7 @@ local RunService = game:GetService("RunService")
 -- // Variables
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local MAX_DISTANCE = 150
+local MAX_DISTANCE = 300
 local FOV_RADIUS = 250
 local AimlockEnabled = false
 local IsAiming = false
