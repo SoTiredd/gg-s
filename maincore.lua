@@ -3,37 +3,18 @@
     Rayfield-Style Builder API with Tactical Modern Aesthetic Client Design
     
     Usage:
-        local Aesthetic = loadfile("init.luau")() -- or require(path)
+        local Aesthetic = loadstring(game:HttpGetAsync("https://raw.githubusercontent.com/SoTiredd/gg-s/refs/heads/main/maincore.lua"))()
         
         local Window = Aesthetic:CreateWindow({
             Title = "Aesthetic",
             SubTitle = "Версия 1.4+eb374b7",
             Logo = "æ",
             Keybind = Enum.KeyCode.RightControl,
-        })
-        
-        local CombatTab = Window:CreateTab({
-            Title = "Combat",
-            Icon = "⚔",
-        })
-        
-        local Module = CombatTab:CreateCard({
-            Title = "Anchor Aura",
-            Icon = "⚓",
-            Side = "Left", -- "Left" or "Right"
-            Default = false,
-            Callback = function(enabled) end,
-        })
-        
-        Module:CreateSlider({
-            Title = "Range",
-            Min = 1,
-            Max = 20,
-            Default = 10,
-            Step = 0.5,
-            Suffix = "m",
-            Flag = "AnchorRange",
-            Callback = function(val) end,
+            UserInfo = {
+                Username = (game:GetService("Players").LocalPlayer and game:GetService("Players").LocalPlayer.Name) or "salam4ik",
+                Subscription = "Dev", -- "Dev" | "Premium" | "Freemium"
+                Subtext = "Developer Access",
+            }
         })
 ]]
 
@@ -45,24 +26,26 @@ local Players = game:GetService("Players")
 
 local LocalPlayer = Players.LocalPlayer
 
--- [1] THEME PALETTE & FONTS
+-- [1] THEME PALETTE & FONTS (Pure neutral dark matte, zero blue tint)
 local Colors = {
-	Background = Color3.fromRGB(12, 13, 15),       -- Deep matte obsidian
-	Sidebar = Color3.fromRGB(12, 13, 15),          -- Left sidebar dock
-	Card = Color3.fromRGB(16, 17, 21),             -- Elevated module card
-	CardHover = Color3.fromRGB(20, 22, 27),
-	Border = Color3.fromRGB(24, 26, 32),           -- 1px hairline border
-	BorderLight = Color3.fromRGB(36, 39, 48),
-	Input = Color3.fromRGB(18, 19, 23),            -- Search & badges
-	InputBorder = Color3.fromRGB(28, 30, 38),
-	Text = Color3.fromRGB(238, 240, 246),          -- Crisp white
-	TextMuted = Color3.fromRGB(130, 136, 150),      -- Descriptions & tab labels
-	TextDark = Color3.fromRGB(70, 75, 88),          -- Section tags & faint subtext
-	SwitchTrackOff = Color3.fromRGB(28, 30, 38),
-	SwitchKnobOff = Color3.fromRGB(80, 85, 98),
+	Background = Color3.fromRGB(11, 11, 13),       -- Deep matte obsidian
+	Sidebar = Color3.fromRGB(11, 11, 13),          -- Left sidebar dock
+	Card = Color3.fromRGB(15, 16, 18),             -- Dark module card
+	CardActive = Color3.fromRGB(19, 20, 23),       -- Elevated active module card (matching reference screenshot)
+	CardHover = Color3.fromRGB(22, 23, 27),
+	Border = Color3.fromRGB(24, 25, 28),           -- 1px hairline border
+	BorderLight = Color3.fromRGB(36, 38, 44),
+	Input = Color3.fromRGB(16, 17, 20),            -- Search & badges
+	InputBorder = Color3.fromRGB(26, 27, 32),
+	Text = Color3.fromRGB(245, 245, 248),          -- Crisp white
+	TextMuted = Color3.fromRGB(135, 138, 148),      -- Descriptions & tab labels
+	TextDark = Color3.fromRGB(75, 78, 88),          -- Section tags & faint subtext
+	SwitchTrackOff = Color3.fromRGB(24, 25, 29),
+	SwitchKnobOff = Color3.fromRGB(75, 78, 88),
 	SwitchTrackOn = Color3.fromRGB(255, 255, 255),  -- Bright white switch track
-	SwitchKnobOn = Color3.fromRGB(14, 15, 18),      -- Dark knob
-	TabActive = Color3.fromRGB(22, 24, 30),         -- Highlighted tab background
+	SwitchKnobOn = Color3.fromRGB(12, 12, 14),      -- Dark knob
+	TabActive = Color3.fromRGB(24, 25, 28),         -- Pure neutral dark graphite (NO BLUE)
+	TabHover = Color3.fromRGB(18, 19, 22),
 	Accent = Color3.fromRGB(255, 255, 255),
 	Success = Color3.fromRGB(46, 204, 113),
 	Warning = Color3.fromRGB(241, 196, 15),
@@ -74,6 +57,39 @@ local Fonts = {
 	Medium = Enum.Font.GothamMedium,
 	Regular = Enum.Font.Gotham,
 }
+
+-- Subscription badge configurations
+local function GetSubscriptionConfig(sub)
+	local s = string.lower(tostring(sub or "premium"))
+	if s:find("dev") then
+		return {
+			Text = "DEV",
+			Bg = Color3.fromRGB(30, 24, 40),
+			Border = Color3.fromRGB(72, 54, 98),
+			Color = Color3.fromRGB(210, 185, 255),
+			Tag = "✦",
+			Subtext = "Developer Access",
+		}
+	elseif s:find("freemium") or s:find("free") then
+		return {
+			Text = "FREEMIUM",
+			Bg = Color3.fromRGB(18, 19, 22),
+			Border = Color3.fromRGB(36, 38, 44),
+			Color = Color3.fromRGB(145, 150, 160),
+			Tag = "",
+			Subtext = "Free Tier",
+		}
+	else -- premium (default)
+		return {
+			Text = "PREMIUM",
+			Bg = Color3.fromRGB(34, 28, 16),
+			Border = Color3.fromRGB(78, 64, 30),
+			Color = Color3.fromRGB(255, 215, 110),
+			Tag = "✦",
+			Subtext = "Premium Access",
+		}
+	end
+end
 
 -- [2] INSTANCE HELPERS
 local function Create(className, properties, children)
@@ -218,7 +234,7 @@ local function EnsureNotifContainer()
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 1),
 		Position = UDim2.new(1, -20, 1, -20),
-		Size = UDim2.new(0, 280, 1, -40),
+		Size = UDim2.new(0, 290, 1, -40),
 		Parent = notifGui,
 	})
 	Create("UIListLayout", {
@@ -241,7 +257,7 @@ function Aesthetic:Notify(config)
 
 	local card = Create("Frame", {
 		Name = "Notif",
-		BackgroundColor3 = Colors.Card,
+		BackgroundColor3 = Colors.CardActive,
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
@@ -250,7 +266,7 @@ function Aesthetic:Notify(config)
 	AddCorner(card, 8)
 	AddStroke(card, Colors.BorderLight, 1)
 
-	local pad = Create("UIPadding", {
+	Create("UIPadding", {
 		PaddingTop = UDim.new(0, 10),
 		PaddingBottom = UDim.new(0, 10),
 		PaddingLeft = UDim.new(0, 12),
@@ -260,7 +276,7 @@ function Aesthetic:Notify(config)
 
 	local topRow = Create("Frame", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 18),
+		Size = UDim2.new(1, 0, 0, 20),
 		Parent = card,
 	})
 
@@ -269,8 +285,8 @@ function Aesthetic:Notify(config)
 		Text = icon,
 		TextColor3 = Colors.Text,
 		Font = Fonts.Bold,
-		TextSize = 12,
-		Size = UDim2.new(0, 18, 1, 0),
+		TextSize = 13,
+		Size = UDim2.new(0, 20, 1, 0),
 		Parent = topRow,
 	})
 
@@ -279,10 +295,10 @@ function Aesthetic:Notify(config)
 		Text = title,
 		TextColor3 = Colors.Text,
 		Font = Fonts.Bold,
-		TextSize = 12,
+		TextSize = 13,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 22, 0, 0),
-		Size = UDim2.new(1, -22, 1, 0),
+		Position = UDim2.new(0, 24, 0, 0),
+		Size = UDim2.new(1, -24, 1, 0),
 		Parent = topRow,
 	})
 
@@ -292,10 +308,10 @@ function Aesthetic:Notify(config)
 			Text = content,
 			TextColor3 = Colors.TextMuted,
 			Font = Fonts.Regular,
-			TextSize = 11,
+			TextSize = 12,
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			Position = UDim2.new(0, 0, 0, 22),
+			Position = UDim2.new(0, 0, 0, 24),
 			Size = UDim2.new(1, 0, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			Parent = card,
@@ -327,10 +343,13 @@ function Aesthetic:CreateWindow(windowConfig)
 	local winSize = windowConfig.Size or UDim2.new(0, 960, 0, 600)
 	local toggleKey = windowConfig.Keybind or Enum.KeyCode.RightControl
 	local customGameName = windowConfig.GameName
+	
+	-- User Profile Information (Username + Subscription Level)
 	local userInfo = windowConfig.UserInfo or {}
-	local userDisplayName = userInfo.Name or (LocalPlayer and LocalPlayer.DisplayName) or "salam4ik"
-	local userTag = userInfo.Tag or "✦"
-	local userSubtext = userInfo.Subtext or "22.08.27"
+	local userDisplayName = userInfo.Username or userInfo.Name or (LocalPlayer and LocalPlayer.Name) or "Player"
+	local userSubTier = userInfo.Subscription or userInfo.Tier or "Premium"
+	local userSubtext = userInfo.Subtext
+	local subConfig = GetSubscriptionConfig(userSubTier)
 
 	-- Clean up existing window
 	local existing = GetSafeGuiParent():FindFirstChild("AestheticClient_GUI")
@@ -408,7 +427,7 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = logoGlyph,
 		TextColor3 = Color3.fromRGB(12, 13, 16),
 		Font = Fonts.Bold,
-		TextSize = 18,
+		TextSize = 20,
 		Position = UDim2.new(0, 0, 0, -1),
 		Size = UDim2.new(1, 0, 1, 0),
 		Parent = logoBox,
@@ -419,10 +438,10 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = winTitle,
 		TextColor3 = Colors.Text,
 		Font = Fonts.Bold,
-		TextSize = 13,
+		TextSize = 15,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Position = UDim2.new(0, 40, 0, 2),
-		Size = UDim2.new(1, -65, 0, 16),
+		Size = UDim2.new(1, -65, 0, 18),
 		Parent = brandBox,
 	})
 
@@ -431,9 +450,9 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = winSub,
 		TextColor3 = Colors.TextDark,
 		Font = Fonts.Regular,
-		TextSize = 9,
+		TextSize = 10,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 40, 0, 18),
+		Position = UDim2.new(0, 40, 0, 20),
 		Size = UDim2.new(1, -40, 0, 14),
 		Parent = brandBox,
 	})
@@ -445,7 +464,7 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = "⚙",
 		TextColor3 = Colors.TextDark,
 		Font = Fonts.Bold,
-		TextSize = 12,
+		TextSize = 13,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, 0, 0.5, 0),
 		Size = UDim2.new(0, 20, 0, 20),
@@ -459,7 +478,7 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = "SECTIONS",
 		TextColor3 = Colors.TextDark,
 		Font = Fonts.Bold,
-		TextSize = 9,
+		TextSize = 10,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Position = UDim2.new(0, 16, 0, 58),
 		Size = UDim2.new(1, -32, 0, 16),
@@ -501,7 +520,7 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = "⇤  Collapse sidebar",
 		TextColor3 = Colors.TextDark,
 		Font = Fonts.Regular,
-		TextSize = 10,
+		TextSize = 11,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Size = UDim2.new(1, 0, 1, 0),
 		Parent = collapseBtn,
@@ -542,8 +561,8 @@ function Aesthetic:CreateWindow(windowConfig)
 
 	local topbarControls = Create("Frame", {
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 16, 0.5, -15),
-		Size = UDim2.new(0, 500, 0, 30),
+		Position = UDim2.new(0, 16, 0.5, -16),
+		Size = UDim2.new(0, 520, 0, 32),
 		Parent = topbar,
 	})
 
@@ -563,9 +582,9 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = "🔍",
 		TextColor3 = Colors.TextDark,
 		Font = Fonts.Regular,
-		TextSize = 10,
+		TextSize = 11,
 		Position = UDim2.new(0, 8, 0, 0),
-		Size = UDim2.new(0, 14, 1, 0),
+		Size = UDim2.new(0, 16, 1, 0),
 		Parent = searchBox,
 	})
 
@@ -575,11 +594,11 @@ function Aesthetic:CreateWindow(windowConfig)
 		PlaceholderColor3 = Colors.TextDark,
 		TextColor3 = Colors.Text,
 		Font = Fonts.Regular,
-		TextSize = 11,
+		TextSize = 12,
 		Text = "",
 		ClearTextOnFocus = false,
-		Position = UDim2.new(0, 26, 0, 0),
-		Size = UDim2.new(1, -30, 1, 0),
+		Position = UDim2.new(0, 28, 0, 0),
+		Size = UDim2.new(1, -32, 1, 0),
 		Parent = searchBox,
 	})
 
@@ -599,9 +618,9 @@ function Aesthetic:CreateWindow(windowConfig)
 		BackgroundTransparency = 1,
 		Text = "🌐",
 		Font = Fonts.Regular,
-		TextSize = 10,
+		TextSize = 11,
 		Position = UDim2.new(0, 8, 0, 0),
-		Size = UDim2.new(0, 14, 1, 0),
+		Size = UDim2.new(0, 16, 1, 0),
 		Parent = gameBadge,
 	})
 
@@ -610,9 +629,9 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = customGameName or "Loading...",
 		TextColor3 = Colors.TextMuted,
 		Font = Fonts.Medium,
-		TextSize = 11,
+		TextSize = 12,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 26, 0, 0),
+		Position = UDim2.new(0, 28, 0, 0),
 		Size = UDim2.new(0, 0, 1, 0),
 		AutomaticSize = Enum.AutomaticSize.X,
 		Parent = gameBadge,
@@ -636,13 +655,15 @@ function Aesthetic:CreateWindow(windowConfig)
 		end)
 	end
 
-	-- User Profile (Top-Right)
+	-------------------------------------------------------------
+	-- USER PROFILE (Top-Right: Username + Subscription Badge)
+	-------------------------------------------------------------
 	local userProfile = Create("Frame", {
 		Name = "UserProfile",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -16, 0.5, 0),
-		Size = UDim2.new(0, 180, 0, 36),
+		Size = UDim2.new(0, 240, 0, 36),
 		Parent = topbar,
 	})
 
@@ -651,10 +672,10 @@ function Aesthetic:CreateWindow(windowConfig)
 		BackgroundColor3 = Colors.Input,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, 0, 0.5, 0),
-		Size = UDim2.new(0, 32, 0, 32),
+		Size = UDim2.new(0, 34, 0, 34),
 		Parent = userProfile,
 	})
-	AddCorner(avatarImg, 16)
+	AddCorner(avatarImg, 17)
 	AddStroke(avatarImg, Colors.BorderLight, 1)
 
 	task.spawn(function()
@@ -669,29 +690,82 @@ function Aesthetic:CreateWindow(windowConfig)
 		end)
 	end)
 
-	Create("TextLabel", {
+	local userDetails = Create("Frame", {
+		Name = "Details",
 		BackgroundTransparency = 1,
-		Text = userDisplayName .. " " .. userTag,
-		TextColor3 = Colors.Text,
-		Font = Fonts.Bold,
-		TextSize = 12,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Position = UDim2.new(0, 0, 0, 2),
-		Size = UDim2.new(1, -40, 0, 16),
+		Position = UDim2.new(0, 0, 0, 0),
+		Size = UDim2.new(1, -44, 1, 0),
 		Parent = userProfile,
 	})
 
-	Create("TextLabel", {
+	-- Top row: Username + Subscription Badge (Right-Aligned)
+	local userTopRow = Create("Frame", {
+		Name = "TopRow",
 		BackgroundTransparency = 1,
-		Text = userSubtext,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 1),
+		Size = UDim2.new(0, 0, 0, 18),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Parent = userDetails,
+	})
+	Create("UIListLayout", {
+		FillDirection = Enum.FillDirection.LeftToRight,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 6),
+		Parent = userTopRow,
+	})
+
+	local usernameLbl = Create("TextLabel", {
+		Name = "Username",
+		BackgroundTransparency = 1,
+		Text = userDisplayName,
+		TextColor3 = Colors.Text,
+		Font = Fonts.Bold,
+		TextSize = 13,
+		Size = UDim2.new(0, 0, 1, 0),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Parent = userTopRow,
+	})
+
+	local subBadge = Create("Frame", {
+		Name = "SubBadge",
+		BackgroundColor3 = subConfig.Bg,
+		Size = UDim2.new(0, 0, 0, 16),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Parent = userTopRow,
+	})
+	AddCorner(subBadge, 4)
+	local subStroke = AddStroke(subBadge, subConfig.Border, 1)
+	Create("UIPadding", {
+		PaddingLeft = UDim.new(0, 6),
+		PaddingRight = UDim.new(0, 6),
+		Parent = subBadge,
+	})
+
+	local subBadgeLbl = Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = subConfig.Text .. (subConfig.Tag ~= "" and (" " .. subConfig.Tag) or ""),
+		TextColor3 = subConfig.Color,
+		Font = Fonts.Bold,
+		TextSize = 9,
+		Size = UDim2.new(0, 0, 1, 0),
+		AutomaticSize = Enum.AutomaticSize.X,
+		Parent = subBadge,
+	})
+
+	local subtextLbl = Create("TextLabel", {
+		Name = "Subtext",
+		BackgroundTransparency = 1,
+		Text = userSubtext or subConfig.Subtext,
 		TextColor3 = Colors.TextDark,
 		Font = Fonts.Regular,
 		TextSize = 10,
 		TextXAlignment = Enum.TextXAlignment.Right,
-		Position = UDim2.new(0, 0, 0, 18),
-		Size = UDim2.new(1, -40, 0, 14),
-		Parent = userProfile,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 19),
+		Size = UDim2.new(1, 0, 0, 14),
+		Parent = userDetails,
 	})
 
 	-------------------------------------------------------------
@@ -710,7 +784,7 @@ function Aesthetic:CreateWindow(windowConfig)
 		Text = "",
 		TextColor3 = Colors.TextDark,
 		Font = Fonts.Bold,
-		TextSize = 11,
+		TextSize = 13,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Position = UDim2.new(0, 0, 0, 0),
 		Size = UDim2.new(1, 0, 0, 18),
@@ -720,8 +794,8 @@ function Aesthetic:CreateWindow(windowConfig)
 	local pagesContainer = Create("Frame", {
 		Name = "PagesContainer",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 0, 0, 22),
-		Size = UDim2.new(1, 0, 1, -22),
+		Position = UDim2.new(0, 0, 0, 24),
+		Size = UDim2.new(1, 0, 1, -24),
 		ClipsDescendants = true,
 		Parent = contentWorkspace,
 	})
@@ -739,6 +813,27 @@ function Aesthetic:CreateWindow(windowConfig)
 		IsCollapsed = false,
 		IsOpen = true,
 	}
+
+	-- Set user details dynamically
+	function Window:SetUser(cfg)
+		cfg = cfg or {}
+		if cfg.Username then
+			usernameLbl.Text = cfg.Username
+		end
+		if cfg.Subscription then
+			local c = GetSubscriptionConfig(cfg.Subscription)
+			subBadge.BackgroundColor3 = c.Bg
+			subStroke.Color = c.Border
+			subBadgeLbl.Text = c.Text .. (c.Tag ~= "" and (" " .. c.Tag) or "")
+			subBadgeLbl.TextColor3 = c.Color
+			if not cfg.Subtext then
+				subtextLbl.Text = c.Subtext
+			end
+		end
+		if cfg.Subtext then
+			subtextLbl.Text = cfg.Subtext
+		end
+	end
 
 	-- Live Search filtering
 	searchInput:GetPropertyChangedSignal("Text"):Connect(function()
@@ -815,6 +910,7 @@ function Aesthetic:CreateWindow(windowConfig)
 			local isCurrent = (t == targetTab or t.Title == targetTab)
 			t.Page.Visible = isCurrent
 			if isCurrent then
+				t.Button.BackgroundColor3 = Colors.TabActive
 				Tween(t.Button, { BackgroundTransparency = 0 }, 0.15)
 				Tween(t.Label, { TextColor3 = Colors.Text }, 0.15)
 				Tween(t.Icon, { TextColor3 = Color3.fromRGB(255, 255, 255) }, 0.15)
@@ -880,12 +976,12 @@ function Aesthetic:CreateWindow(windowConfig)
 		})
 		Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 12), Parent = right })
 
-		-- Tab Button in Sidebar
+		-- Tab Button in Sidebar (34px height for great touch and mouse feel)
 		local tabBtn = Create("TextButton", {
 			Name = "Tab_" .. tabTitle,
 			BackgroundColor3 = Colors.TabActive,
 			BackgroundTransparency = 1,
-			Size = UDim2.new(1, 0, 0, 32),
+			Size = UDim2.new(1, 0, 0, 34),
 			Text = "",
 			AutoButtonColor = false,
 			Parent = tabList,
@@ -897,9 +993,9 @@ function Aesthetic:CreateWindow(windowConfig)
 			Text = tabIcon,
 			TextColor3 = Colors.TextMuted,
 			Font = Fonts.Bold,
-			TextSize = 13,
+			TextSize = 15,
 			Position = UDim2.new(0, 10, 0, 0),
-			Size = UDim2.new(0, 18, 1, 0),
+			Size = UDim2.new(0, 20, 1, 0),
 			Parent = tabBtn,
 		})
 
@@ -908,10 +1004,10 @@ function Aesthetic:CreateWindow(windowConfig)
 			Text = tabTitle,
 			TextColor3 = Colors.TextMuted,
 			Font = Fonts.Medium,
-			TextSize = 12,
+			TextSize = 13,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			Position = UDim2.new(0, 34, 0, 0),
-			Size = UDim2.new(1, -40, 1, 0),
+			Position = UDim2.new(0, 36, 0, 0),
+			Size = UDim2.new(1, -42, 1, 0),
 			Visible = not Window.IsCollapsed,
 			Parent = tabBtn,
 		})
@@ -926,6 +1022,22 @@ function Aesthetic:CreateWindow(windowConfig)
 			RightCol = right,
 			Cards = {},
 		}
+
+		-- Smooth hover effect for inactive tabs
+		tabBtn.MouseEnter:Connect(function()
+			if Window.ActiveTab ~= tabObj then
+				Tween(tabBtn, { BackgroundColor3 = Colors.TabHover, BackgroundTransparency = 0 }, 0.12)
+				Tween(label, { TextColor3 = Colors.Text }, 0.12)
+				Tween(iconLbl, { TextColor3 = Colors.Text }, 0.12)
+			end
+		end)
+		tabBtn.MouseLeave:Connect(function()
+			if Window.ActiveTab ~= tabObj then
+				Tween(tabBtn, { BackgroundTransparency = 1 }, 0.12)
+				Tween(label, { TextColor3 = Colors.TextMuted }, 0.12)
+				Tween(iconLbl, { TextColor3 = Colors.TextMuted }, 0.12)
+			end
+		end)
 
 		tabBtn.MouseButton1Click:Connect(function()
 			Window:SelectTab(tabObj)
@@ -956,18 +1068,18 @@ function Aesthetic:CreateWindow(windowConfig)
 
 			local cardFrame = Create("Frame", {
 				Name = "Card_" .. cardTitle,
-				BackgroundColor3 = Colors.Card,
+				BackgroundColor3 = isEnabled and Colors.CardActive or Colors.Card,
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Parent = cardSide,
 			})
 			AddCorner(cardFrame, 8)
-			AddStroke(cardFrame, Colors.Border, 1)
+			local cardStroke = AddStroke(cardFrame, isEnabled and Colors.BorderLight or Colors.Border, 1)
 
 			local header = Create("Frame", {
 				Name = "Header",
 				BackgroundTransparency = 1,
-				Size = UDim2.new(1, 0, 0, 40),
+				Size = UDim2.new(1, 0, 0, 42),
 				Parent = cardFrame,
 			})
 
@@ -978,12 +1090,12 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = cardIcon,
 					TextColor3 = Colors.Text,
 					Font = Fonts.Bold,
-					TextSize = 13,
+					TextSize = 15,
 					Position = UDim2.new(0, 14, 0, 0),
-					Size = UDim2.new(0, 16, 1, 0),
+					Size = UDim2.new(0, 18, 1, 0),
 					Parent = header,
 				})
-				headerX = 36
+				headerX = 38
 			end
 
 			Create("TextLabel", {
@@ -991,7 +1103,7 @@ function Aesthetic:CreateWindow(windowConfig)
 				Text = cardTitle,
 				TextColor3 = Colors.Text,
 				Font = Fonts.Bold,
-				TextSize = 12,
+				TextSize = 14,
 				TextXAlignment = Enum.TextXAlignment.Left,
 				Position = UDim2.new(0, headerX, 0, 0),
 				Size = UDim2.new(1, -headerX - 60, 1, 0),
@@ -1021,7 +1133,7 @@ function Aesthetic:CreateWindow(windowConfig)
 			local body = Create("Frame", {
 				Name = "Body",
 				BackgroundTransparency = 1,
-				Position = UDim2.new(0, 0, 0, 40),
+				Position = UDim2.new(0, 0, 0, 42),
 				Size = UDim2.new(1, 0, 0, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Parent = cardFrame,
@@ -1054,9 +1166,13 @@ function Aesthetic:CreateWindow(windowConfig)
 				end
 
 				if isEnabled then
+					Tween(cardFrame, { BackgroundColor3 = Colors.CardActive }, 0.15)
+					Tween(cardStroke, { Color = Colors.BorderLight }, 0.15)
 					Tween(switch, { BackgroundColor3 = Colors.SwitchTrackOn }, 0.15)
 					Tween(knob, { Position = UDim2.new(1, -16, 0.5, -7), BackgroundColor3 = Colors.SwitchKnobOn }, 0.15)
 				else
+					Tween(cardFrame, { BackgroundColor3 = Colors.Card }, 0.15)
+					Tween(cardStroke, { Color = Colors.Border }, 0.15)
 					Tween(switch, { BackgroundColor3 = Colors.SwitchTrackOff }, 0.15)
 					Tween(knob, { Position = UDim2.new(0, 2, 0.5, -7), BackgroundColor3 = Colors.SwitchKnobOff }, 0.15)
 				end
@@ -1092,7 +1208,7 @@ function Aesthetic:CreateWindow(windowConfig)
 
 				local row = Create("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 22),
+					Size = UDim2.new(1, 0, 0, 24),
 					Parent = body,
 				})
 
@@ -1101,7 +1217,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = tTitle,
 					TextColor3 = Colors.TextMuted,
 					Font = Fonts.Medium,
-					TextSize = 11,
+					TextSize = 12,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					Position = UDim2.new(0, 0, 0, 0),
 					Size = UDim2.new(1, -40, 1, 0),
@@ -1169,7 +1285,7 @@ function Aesthetic:CreateWindow(windowConfig)
 
 				local row = Create("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 20),
+					Size = UDim2.new(1, 0, 0, 24),
 					Parent = body,
 				})
 
@@ -1178,7 +1294,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = sTitle,
 					TextColor3 = Colors.TextMuted,
 					Font = Fonts.Medium,
-					TextSize = 11,
+					TextSize = 12,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					Position = UDim2.new(0, 0, 0, 0),
 					Size = UDim2.new(0.4, 0, 1, 0),
@@ -1198,7 +1314,7 @@ function Aesthetic:CreateWindow(windowConfig)
 				local initialPct = math.clamp((curVal - min) / (max - min), 0, 1)
 
 				local fill = Create("Frame", {
-					BackgroundColor3 = Color3.fromRGB(180, 185, 200),
+					BackgroundColor3 = Color3.fromRGB(190, 195, 205),
 					Size = UDim2.new(initialPct, 0, 1, 0),
 					Parent = track,
 				})
@@ -1207,17 +1323,17 @@ function Aesthetic:CreateWindow(windowConfig)
 					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 					AnchorPoint = Vector2.new(0.5, 0.5),
 					Position = UDim2.new(initialPct, 0, 0.5, 0),
-					Size = UDim2.new(0, 8, 0, 8),
+					Size = UDim2.new(0, 10, 0, 10),
 					Parent = track,
 				})
-				AddCorner(dot, 4)
+				AddCorner(dot, 5)
 
 				local valLbl = Create("TextLabel", {
 					BackgroundTransparency = 1,
 					Text = tostring(curVal) .. suffix,
 					TextColor3 = Colors.TextMuted,
 					Font = Fonts.Medium,
-					TextSize = 11,
+					TextSize = 12,
 					TextXAlignment = Enum.TextXAlignment.Right,
 					Position = UDim2.new(0.86, 0, 0, 0),
 					Size = UDim2.new(0.14, 0, 1, 0),
@@ -1229,7 +1345,6 @@ function Aesthetic:CreateWindow(windowConfig)
 					if step > 0 then
 						newVal = math.floor((newVal - min) / step + 0.5) * step + min
 					end
-					-- Round to clean decimals
 					if step < 1 then
 						newVal = tonumber(string.format("%.2f", newVal))
 					else
@@ -1295,7 +1410,7 @@ function Aesthetic:CreateWindow(windowConfig)
 
 				local row = Create("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 24),
+					Size = UDim2.new(1, 0, 0, 26),
 					Parent = body,
 				})
 
@@ -1304,7 +1419,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = dTitle,
 					TextColor3 = Colors.TextMuted,
 					Font = Fonts.Medium,
-					TextSize = 11,
+					TextSize = 12,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					Position = UDim2.new(0, 0, 0, 0),
 					Size = UDim2.new(0.4, 0, 1, 0),
@@ -1315,7 +1430,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					BackgroundColor3 = Colors.Input,
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, 0, 0.5, 0),
-					Size = UDim2.new(0.55, 0, 0, 22),
+					Size = UDim2.new(0.55, 0, 0, 24),
 					Text = "",
 					AutoButtonColor = false,
 					Parent = row,
@@ -1328,7 +1443,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = tostring(currentChoice),
 					TextColor3 = Colors.Text,
 					Font = Fonts.Regular,
-					TextSize = 10,
+					TextSize = 11,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextTruncate = Enum.TextTruncate.AtEnd,
 					Position = UDim2.new(0, 8, 0, 0),
@@ -1341,7 +1456,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = "v",
 					TextColor3 = Colors.TextDark,
 					Font = Fonts.Bold,
-					TextSize = 8,
+					TextSize = 9,
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, -6, 0.5, 0),
 					Size = UDim2.new(0, 10, 0, 10),
@@ -1349,7 +1464,7 @@ function Aesthetic:CreateWindow(windowConfig)
 				})
 
 				local menu = Create("ScrollingFrame", {
-					BackgroundColor3 = Colors.Card,
+					BackgroundColor3 = Colors.CardActive,
 					BorderSizePixel = 0,
 					ScrollBarThickness = 2,
 					ScrollBarImageColor3 = Colors.BorderLight,
@@ -1360,8 +1475,8 @@ function Aesthetic:CreateWindow(windowConfig)
 					Parent = overlay,
 				})
 				AddCorner(menu, 6)
-				AddStroke(menu, Colors.Border, 1)
-				AddShadow(menu, 10)
+				AddStroke(menu, Colors.BorderLight, 1)
+				AddShadow(menu, 12)
 				Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 2), Parent = menu })
 				Create("UIPadding", {
 					PaddingTop = UDim.new(0, 4),
@@ -1383,10 +1498,10 @@ function Aesthetic:CreateWindow(windowConfig)
 							Text = tostring(opt),
 							TextColor3 = (opt == currentChoice) and Colors.Text or Colors.TextMuted,
 							Font = Fonts.Regular,
-							TextSize = 10,
+							TextSize = 11,
 							BackgroundColor3 = Colors.Input,
 							BackgroundTransparency = (opt == currentChoice) and 0.8 or 1,
-							Size = UDim2.new(1, 0, 0, 22),
+							Size = UDim2.new(1, 0, 0, 24),
 							AutoButtonColor = false,
 							Parent = menu,
 						})
@@ -1417,7 +1532,7 @@ function Aesthetic:CreateWindow(windowConfig)
 						local abs = btn.AbsolutePosition
 						local sz = btn.AbsoluteSize
 						menu.Position = UDim2.new(0, abs.X, 0, abs.Y + sz.Y + 4)
-						menu.Size = UDim2.new(0, sz.X, 0, math.min(#options * 24 + 10, 120))
+						menu.Size = UDim2.new(0, sz.X, 0, math.min(#options * 26 + 10, 130))
 						menu.Visible = true
 					else
 						menu.Visible = false
@@ -1453,7 +1568,7 @@ function Aesthetic:CreateWindow(windowConfig)
 
 				local row = Create("TextButton", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 20),
+					Size = UDim2.new(1, 0, 0, 24),
 					Text = "",
 					AutoButtonColor = false,
 					Parent = body,
@@ -1464,10 +1579,10 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = cTitle,
 					TextColor3 = Colors.TextMuted,
 					Font = Fonts.Medium,
-					TextSize = 11,
+					TextSize = 12,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					Position = UDim2.new(0, 0, 0, 0),
-					Size = UDim2.new(1, -26, 1, 0),
+					Size = UDim2.new(1, -28, 1, 0),
 					Parent = row,
 				})
 
@@ -1475,7 +1590,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					BackgroundColor3 = isChecked and Color3.fromRGB(255, 255, 255) or Colors.Input,
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, 0, 0.5, 0),
-					Size = UDim2.new(0, 16, 0, 16),
+					Size = UDim2.new(0, 18, 0, 18),
 					Parent = row,
 				})
 				AddCorner(box, 4)
@@ -1486,7 +1601,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = "✓",
 					TextColor3 = Color3.fromRGB(12, 13, 16),
 					Font = Fonts.Bold,
-					TextSize = 11,
+					TextSize = 12,
 					Visible = isChecked,
 					Size = UDim2.new(1, 0, 1, 0),
 					Parent = box,
@@ -1520,11 +1635,11 @@ function Aesthetic:CreateWindow(windowConfig)
 
 				local btn = Create("TextButton", {
 					BackgroundColor3 = Colors.Input,
-					Size = UDim2.new(1, 0, 0, 24),
+					Size = UDim2.new(1, 0, 0, 26),
 					Text = bTitle,
 					TextColor3 = Colors.Text,
 					Font = Fonts.Medium,
-					TextSize = 11,
+					TextSize = 12,
 					AutoButtonColor = false,
 					Parent = body,
 				})
@@ -1538,7 +1653,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Tween(btn, { BackgroundColor3 = Colors.Input }, 0.1)
 				end)
 				btn.MouseButton1Click:Connect(function()
-					Tween(btn, { BackgroundColor3 = Color3.fromRGB(35, 38, 48) }, 0.08)
+					Tween(btn, { BackgroundColor3 = Color3.fromRGB(32, 33, 40) }, 0.08)
 					task.wait(0.08)
 					Tween(btn, { BackgroundColor3 = Colors.CardHover }, 0.1)
 					pcall(bCallback)
@@ -1563,7 +1678,7 @@ function Aesthetic:CreateWindow(windowConfig)
 
 				local row = Create("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 22),
+					Size = UDim2.new(1, 0, 0, 24),
 					Parent = body,
 				})
 
@@ -1572,7 +1687,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = kTitle,
 					TextColor3 = Colors.TextMuted,
 					Font = Fonts.Medium,
-					TextSize = 11,
+					TextSize = 12,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					Position = UDim2.new(0, 0, 0, 0),
 					Size = UDim2.new(0.6, 0, 1, 0),
@@ -1583,11 +1698,11 @@ function Aesthetic:CreateWindow(windowConfig)
 					BackgroundColor3 = Colors.Input,
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, 0, 0.5, 0),
-					Size = UDim2.new(0, 60, 0, 20),
+					Size = UDim2.new(0, 64, 0, 22),
 					Text = curKey == Enum.KeyCode.Unknown and "[ None ]" or ("[ " .. curKey.Name .. " ]"),
 					TextColor3 = Colors.Text,
 					Font = Fonts.Regular,
-					TextSize = 10,
+					TextSize = 11,
 					AutoButtonColor = false,
 					Parent = row,
 				})
@@ -1645,7 +1760,7 @@ function Aesthetic:CreateWindow(windowConfig)
 
 				local row = Create("Frame", {
 					BackgroundTransparency = 1,
-					Size = UDim2.new(1, 0, 0, 24),
+					Size = UDim2.new(1, 0, 0, 26),
 					Parent = body,
 				})
 
@@ -1654,7 +1769,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = iTitle,
 					TextColor3 = Colors.TextMuted,
 					Font = Fonts.Medium,
-					TextSize = 11,
+					TextSize = 12,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					Position = UDim2.new(0, 0, 0, 0),
 					Size = UDim2.new(0.4, 0, 1, 0),
@@ -1665,7 +1780,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					BackgroundColor3 = Colors.Input,
 					AnchorPoint = Vector2.new(1, 0.5),
 					Position = UDim2.new(1, 0, 0.5, 0),
-					Size = UDim2.new(0.55, 0, 0, 22),
+					Size = UDim2.new(0.55, 0, 0, 24),
 					Parent = row,
 				})
 				AddCorner(boxFrame, 4)
@@ -1678,10 +1793,10 @@ function Aesthetic:CreateWindow(windowConfig)
 					PlaceholderColor3 = Colors.TextDark,
 					TextColor3 = Colors.Text,
 					Font = Fonts.Regular,
-					TextSize = 10,
+					TextSize = 11,
 					ClearTextOnFocus = false,
-					Position = UDim2.new(0, 6, 0, 0),
-					Size = UDim2.new(1, -12, 1, 0),
+					Position = UDim2.new(0, 8, 0, 0),
+					Size = UDim2.new(1, -16, 1, 0),
 					Parent = boxFrame,
 				})
 
@@ -1711,7 +1826,7 @@ function Aesthetic:CreateWindow(windowConfig)
 					Text = lText,
 					TextColor3 = Colors.TextMuted,
 					Font = Fonts.Regular,
-					TextSize = 11,
+					TextSize = 12,
 					TextWrapped = true,
 					TextXAlignment = Enum.TextXAlignment.Left,
 					Size = UDim2.new(1, 0, 0, 0),
