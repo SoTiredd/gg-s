@@ -44,8 +44,8 @@ local Colors = {
 	SwitchKnobOff = Color3.fromRGB(75, 78, 88),
 	SwitchTrackOn = Color3.fromRGB(255, 255, 255),  -- Bright white switch track
 	SwitchKnobOn = Color3.fromRGB(12, 12, 14),      -- Dark knob
-	TabActive = Color3.fromRGB(24, 25, 28),         -- Pure neutral dark graphite (NO BLUE)
-	TabHover = Color3.fromRGB(18, 19, 22),
+	TabActive = Color3.fromRGB(20, 21, 24),         -- Subtle elevated neutral dark graphite (NO BLUE)
+	TabHover = Color3.fromRGB(16, 17, 20),
 	Accent = Color3.fromRGB(255, 255, 255),
 	Success = Color3.fromRGB(46, 204, 113),
 	Warning = Color3.fromRGB(241, 196, 15),
@@ -473,6 +473,16 @@ function Aesthetic:CreateWindow(windowConfig)
 		Parent = brandBox,
 	})
 
+	-- Brand Divider under logo/brand (shorter in folded mode, longer in usual mode)
+	local brandDivider = Create("Frame", {
+		Name = "BrandDivider",
+		BackgroundColor3 = Colors.Border,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 14, 0, 52),
+		Size = UDim2.new(1, -28, 0, 1),
+		Parent = sidebar,
+	})
+
 	-- Section Tag
 	local sectionsHeader = Create("TextLabel", {
 		BackgroundTransparency = 1,
@@ -481,7 +491,7 @@ function Aesthetic:CreateWindow(windowConfig)
 		Font = Fonts.Bold,
 		TextSize = 10,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 16, 0, 58),
+		Position = UDim2.new(0, 16, 0, 62),
 		Size = UDim2.new(1, -32, 0, 16),
 		Parent = sidebar,
 	})
@@ -493,8 +503,8 @@ function Aesthetic:CreateWindow(windowConfig)
 		BorderSizePixel = 0,
 		ScrollBarThickness = 2,
 		ScrollBarImageColor3 = Colors.BorderLight,
-		Position = UDim2.new(0, 10, 0, 78),
-		Size = UDim2.new(1, -20, 1, -120),
+		Position = UDim2.new(0, 10, 0, 84),
+		Size = UDim2.new(1, -20, 1, -126),
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		Parent = sidebar,
@@ -878,17 +888,17 @@ function Aesthetic:CreateWindow(windowConfig)
 			settingsGear.Visible = false
 
 			brandBox.Position = UDim2.new(0, 0, 0, 10)
-			brandBox.Size = UDim2.new(1, 0, 0, 36)
-			logoBox.Position = UDim2.new(0.5, -16, 0.5, -16)
+			brandBox.Size = UDim2.new(1, 0, 0, 32)
+			logoBox.Position = UDim2.new(0.5, -16, 0, 0)
 
-			sectionsHeader.Text = "CORE"
-			sectionsHeader.TextXAlignment = Enum.TextXAlignment.Center
-			sectionsHeader.Position = UDim2.new(0, 0, 0, 58)
-			sectionsHeader.Size = UDim2.new(1, 0, 0, 16)
-			sectionsHeader.Visible = true
+			-- Divider under logo: shorter in hidden tabs mode (32px, centered under logo)
+			Tween(brandDivider, { Position = UDim2.new(0.5, -16, 0, 52), Size = UDim2.new(0, 32, 0, 1) }, 0.2)
 
-			tabList.Position = UDim2.new(0, 6, 0, 78)
-			tabList.Size = UDim2.new(1, -12, 1, -120)
+			-- When hiding tabs, section header and tab names are completely hidden
+			sectionsHeader.Visible = false
+
+			tabList.Position = UDim2.new(0, 6, 0, 62)
+			tabList.Size = UDim2.new(1, -12, 1, -104)
 			for _, t in ipairs(Window.Tabs) do
 				t.Label.Visible = false
 				t.Icon.Position = UDim2.new(0, 0, 0, 0)
@@ -916,14 +926,17 @@ function Aesthetic:CreateWindow(windowConfig)
 			brandBox.Size = UDim2.new(1, -28, 0, 36)
 			logoBox.Position = UDim2.new(0, 0, 0.5, -16)
 
+			-- Divider under logo: longer in usual mode (spanning across the 185px sidebar)
+			Tween(brandDivider, { Position = UDim2.new(0, 14, 0, 52), Size = UDim2.new(1, -28, 0, 1) }, 0.2)
+
 			sectionsHeader.Text = "SECTIONS"
 			sectionsHeader.TextXAlignment = Enum.TextXAlignment.Left
-			sectionsHeader.Position = UDim2.new(0, 16, 0, 58)
+			sectionsHeader.Position = UDim2.new(0, 16, 0, 62)
 			sectionsHeader.Size = UDim2.new(1, -32, 0, 16)
 			sectionsHeader.Visible = true
 
-			tabList.Position = UDim2.new(0, 10, 0, 78)
-			tabList.Size = UDim2.new(1, -20, 1, -120)
+			tabList.Position = UDim2.new(0, 10, 0, 84)
+			tabList.Size = UDim2.new(1, -20, 1, -126)
 			for _, t in ipairs(Window.Tabs) do
 				t.Label.Visible = true
 				t.Icon.Position = UDim2.new(0, 10, 0, 0)
@@ -991,6 +1004,9 @@ function Aesthetic:CreateWindow(windowConfig)
 				Tween(t.Icon, { TextColor3 = Colors.TextMuted }, 0.15)
 				t.Label.Font = Fonts.Medium
 			end
+			if self.IsCollapsed then
+				t.Label.Visible = false
+			end
 		end
 	end
 
@@ -1052,6 +1068,7 @@ function Aesthetic:CreateWindow(windowConfig)
 			Size = UDim2.new(1, 0, 0, 34),
 			Text = "",
 			AutoButtonColor = false,
+			ClipsDescendants = true,
 			Parent = tabList,
 		})
 		AddCorner(tabBtn, 6)
@@ -1100,12 +1117,18 @@ function Aesthetic:CreateWindow(windowConfig)
 				Tween(label, { TextColor3 = Colors.Text }, 0.12)
 				Tween(iconLbl, { TextColor3 = Colors.Text }, 0.12)
 			end
+			if Window.IsCollapsed then
+				label.Visible = false
+			end
 		end)
 		tabBtn.MouseLeave:Connect(function()
 			if Window.ActiveTab ~= tabObj then
 				Tween(tabBtn, { BackgroundTransparency = 1 }, 0.12)
 				Tween(label, { TextColor3 = Colors.TextMuted }, 0.12)
 				Tween(iconLbl, { TextColor3 = Colors.TextMuted }, 0.12)
+			end
+			if Window.IsCollapsed then
+				label.Visible = false
 			end
 		end)
 
