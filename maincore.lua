@@ -1,60 +1,63 @@
 --[[
-    VantaUI --- GTA V Corner Mod Menu Suite (Clean Edition)
-    Flow: Animated Pre-Login Loader -> Key Verification Login -> Decrypt -> Corner WASD Menu
-    Controls:
-      [W / Up]       : Previous Item
-      [S / Down]     : Next Item
-      [A / Left]     : Adjust Slider Down / Previous Option
-      [D / Right]    : Adjust Slider Up / Next Option
-      [Enter / Space]: Select / Toggle / Trigger Action
-      [Q / E]        : Switch Between Tabs
-      [Insert / F4]  : Hide / Show Corner Menu
-      + Full Mouse Click & Hover Support
+    VantaUI --- Modern Obsidian Glass Interface Suite
+    A modern, draggable, glassmorphic UI library for Roblox Luau.
+    Features:
+    - Sleek modern floating window with inertia dragging (mouse + touch)
+    - Dynamic Left Navigation Rail with sliding active pill and player profile dock (Avatar, FPS, Ping)
+    - Pre-Login Animated Cyber Loader -> Key Verification Modal -> Smooth Decrypt Transition
+    - Search Bar: Live instant search filtering across elements
+    - Controls: Toggles, Sliders, Dropdowns (Floating Overlay), ColorPickers, Keybinds, Inputs, Buttons, Paragraphs
+    - Stackable Toast Notifications with countdown timers
+    - Pure Luau, zero external dependencies, executor-safe mounting (gethui/CoreGui/PlayerGui)
 ]]
 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 
 local LocalPlayer = Players.LocalPlayer
 
 local Vanta = {
-	Version = "2.1.0",
+	Version = "3.0.0",
 	Flags = {},
-	CurrentMenu = nil,
+	CurrentWindow = nil,
 	ScreenGui = nil,
+	Overlay = nil,
 	NotificationContainer = nil,
 	Open = true,
-	ToggleKey = Enum.KeyCode.Insert,
+	ToggleKey = Enum.KeyCode.RightControl,
 }
 
 -- [1] THEME PALETTE
 local Theme = {
-	Accent = Color3.fromRGB(168, 85, 247), -- Purple/Violet GTA V mod menu accent
-	AccentDark = Color3.fromRGB(120, 50, 185),
-	AccentGlow = Color3.fromRGB(192, 132, 252),
-	Background = Color3.fromRGB(13, 14, 18),
-	Banner = Color3.fromRGB(18, 14, 25),
-	Header = Color3.fromRGB(20, 22, 28),
-	SubHeader = Color3.fromRGB(16, 17, 22),
-	Row = Color3.fromRGB(18, 20, 26),
-	RowSelected = Color3.fromRGB(168, 85, 247),
-	RowSelectedText = Color3.fromRGB(255, 255, 255),
-	Border = Color3.fromRGB(36, 40, 52),
-	BorderLight = Color3.fromRGB(55, 60, 78),
-	Text = Color3.fromRGB(240, 243, 248),
-	TextMuted = Color3.fromRGB(145, 153, 168),
-	TextDark = Color3.fromRGB(90, 96, 110),
-	Success = Color3.fromRGB(46, 204, 113),
-	Warning = Color3.fromRGB(241, 196, 15),
-	Error = Color3.fromRGB(231, 76, 60),
-	ToggleOn = Color3.fromRGB(46, 204, 113),
-	ToggleOff = Color3.fromRGB(50, 55, 68),
+	Accent = Color3.fromRGB(0, 210, 255),       -- Electric Cyan / Aqua
+	AccentDim = Color3.fromRGB(0, 140, 190),
+	AccentGlow = Color3.fromRGB(0, 230, 255),
+	Background = Color3.fromRGB(12, 13, 17),    -- Deep Obsidian
+	Sidebar = Color3.fromRGB(15, 17, 22),       -- Left Rail
+	Topbar = Color3.fromRGB(14, 15, 20),
+	Card = Color3.fromRGB(19, 21, 28),          -- Elevated Card
+	CardHover = Color3.fromRGB(24, 27, 36),
+	CardHeader = Color3.fromRGB(22, 25, 33),
+	Input = Color3.fromRGB(16, 18, 24),
+	InputHover = Color3.fromRGB(21, 24, 32),
+	Border = Color3.fromRGB(34, 38, 50),
+	BorderLight = Color3.fromRGB(48, 54, 70),
+	ToggleOff = Color3.fromRGB(32, 36, 48),
+	ToggleKnob = Color3.fromRGB(255, 255, 255),
+	Text = Color3.fromRGB(240, 244, 250),
+	TextMuted = Color3.fromRGB(140, 148, 164),
+	TextDark = Color3.fromRGB(85, 92, 108),
+	Success = Color3.fromRGB(16, 185, 129),
+	Warning = Color3.fromRGB(245, 158, 11),
+	Error = Color3.fromRGB(239, 68, 68),
+	Info = Color3.fromRGB(0, 210, 255),
 }
 Vanta.Theme = Theme
 
--- [2] INTERNAL UTILITY HELPERS
+-- [2] UTILITY HELPERS
 local function Create(className, properties, children)
 	local inst = Instance.new(className)
 	for prop, val in pairs(properties or {}) do
@@ -74,9 +77,84 @@ local function Create(className, properties, children)
 end
 
 local function Tween(instance, properties, duration, style, direction)
-	local tw = TweenService:Create(instance, TweenInfo.new(duration or 0.18, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out), properties)
+	local tw = TweenService:Create(instance, TweenInfo.new(duration or 0.2, style or Enum.EasingStyle.Quad, direction or Enum.EasingDirection.Out), properties)
 	tw:Play()
 	return tw
+end
+
+local function AddCorner(instance, radius)
+	return Create("UICorner", { CornerRadius = UDim.new(0, radius or 8), Parent = instance })
+end
+
+local function AddStroke(instance, color, thickness)
+	return Create("UIStroke", {
+		Color = color or Theme.Border,
+		Thickness = thickness or 1,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		Parent = instance,
+	})
+end
+
+local function AddBevelGradient(stroke)
+	return Create("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.15),
+			NumberSequenceKeypoint.new(1, 0.75),
+		}),
+		Parent = stroke,
+	})
+end
+
+local function AddShadow(instance, elevation)
+	elevation = elevation or 16
+	return Create("ImageLabel", {
+		Name = "Shadow",
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://6015897843",
+		ImageColor3 = Color3.fromRGB(0, 0, 0),
+		ImageTransparency = 0.4,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = Rect.new(49, 49, 450, 450),
+		Position = UDim2.new(0, -elevation, 0, -elevation),
+		Size = UDim2.new(1, elevation * 2, 1, elevation * 2),
+		ZIndex = math.max(1, instance.ZIndex - 1),
+		Parent = instance,
+	})
+end
+
+local function MakeDraggable(handle, target)
+	local dragging = false
+	local dragInput, dragStart, startPos
+	
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = target.Position
+			
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+	
+	handle.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+	
+	UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			Tween(target, {
+				Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			}, 0.06, Enum.EasingStyle.Sine)
+		end
+	end)
 end
 
 local function GetSafeGuiParent()
@@ -93,25 +171,15 @@ local function GetSafeGuiParent()
 	return CoreGui
 end
 
-local function Shake(frame, originPos)
-	task.spawn(function()
-		local steps = { -10, 8, -6, 4, -2, 0 }
-		for _, offset in ipairs(steps) do
-			Tween(frame, { Position = UDim2.new(originPos.X.Scale, originPos.X.Offset + offset, originPos.Y.Scale, originPos.Y.Offset) }, 0.04)
-			task.wait(0.04)
-		end
-	end)
-end
-
--- [3] SCREEN GUI INITIALIZATION
+-- [3] ROOT SCREEN GUI
 function Vanta:InitRoot()
 	if self.ScreenGui and self.ScreenGui.Parent then return end
 	
-	local existing = GetSafeGuiParent():FindFirstChild("VantaSuite_Root")
+	local existing = GetSafeGuiParent():FindFirstChild("VantaNova_Container")
 	if existing then existing:Destroy() end
 	
 	local screenGui = Create("ScreenGui", {
-		Name = "VantaSuite_Root",
+		Name = "VantaNova_Container",
 		ResetOnSpawn = false,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 		DisplayOrder = 9999,
@@ -124,13 +192,13 @@ function Vanta:InitRoot()
 		pcall(protectgui, screenGui)
 	end
 	
-	-- Toast notifications container (Bottom-Right)
-	local notifs = Create("Frame", {
+	-- Toast Notifications Stack (Bottom-Right)
+	local notifContainer = Create("Frame", {
 		Name = "Notifications",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(1, -320, 1, -20),
+		Position = UDim2.new(1, -330, 1, -20),
 		AnchorPoint = Vector2.new(0, 1),
-		Size = UDim2.new(0, 300, 1, -40),
+		Size = UDim2.new(0, 310, 1, -40),
 		ZIndex = 1000,
 		Parent = screenGui,
 	})
@@ -139,13 +207,23 @@ function Vanta:InitRoot()
 		VerticalAlignment = Enum.VerticalAlignment.Bottom,
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Padding = UDim.new(0, 8),
-		Parent = notifs,
+		Parent = notifContainer,
+	})
+	
+	-- Floating Overlay Layer (Dropdowns, Color Pickers)
+	local overlay = Create("Frame", {
+		Name = "OverlayLayer",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 1, 0),
+		ZIndex = 500,
+		Parent = screenGui,
 	})
 	
 	self.ScreenGui = screenGui
-	self.NotificationContainer = notifs
+	self.NotificationContainer = notifContainer
+	self.Overlay = overlay
 	
-	-- Global Toggle Key (Insert / F4)
+	-- Global Toggle Key listener (RightControl / Insert)
 	UserInputService.InputBegan:Connect(function(input, gpe)
 		if gpe and UserInputService:GetFocusedTextBox() then return end
 		if input.KeyCode == self.ToggleKey then
@@ -154,7 +232,7 @@ function Vanta:InitRoot()
 	end)
 end
 
--- [4] NOTIFICATIONS
+-- [4] TOAST NOTIFICATIONS
 function Vanta:Notify(config)
 	self:InitRoot()
 	config = config or {}
@@ -166,15 +244,17 @@ function Vanta:Notify(config)
 	local accent = notifType == "Success" and Theme.Success or notifType == "Warning" and Theme.Warning or notifType == "Error" and Theme.Error or Theme.Accent
 	
 	local card = Create("Frame", {
-		BackgroundColor3 = Theme.Header,
-		Size = UDim2.new(1, 0, 0, 54),
+		BackgroundColor3 = Theme.Card,
+		Size = UDim2.new(1, 0, 0, 60),
 		ClipsDescendants = true,
 		Parent = self.NotificationContainer,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = card })
-	Create("UIStroke", { Color = Theme.Border, Thickness = 1, Parent = card })
+	AddCorner(card, 8)
+	local stroke = AddStroke(card, Theme.Border, 1)
+	AddBevelGradient(stroke)
+	AddShadow(card, 10)
 	
-	-- Left Accent Indicator
+	-- Left Accent Glow Indicator
 	Create("Frame", {
 		BackgroundColor3 = accent,
 		BorderSizePixel = 0,
@@ -187,29 +267,39 @@ function Vanta:Notify(config)
 		Text = string.upper(title),
 		TextColor3 = accent,
 		Font = Enum.Font.GothamBold,
-		TextSize = 11,
+		TextSize = 12,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 12, 0, 8),
-		Size = UDim2.new(1, -20, 0, 14),
+		Position = UDim2.new(0, 14, 0, 10),
+		Size = UDim2.new(1, -24, 0, 16),
 		Parent = card,
 	})
 	
 	Create("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = content,
-		TextColor3 = Theme.Text,
+		TextColor3 = Theme.TextMuted,
 		Font = Enum.Font.Gotham,
 		TextSize = 11,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 12, 0, 24),
-		Size = UDim2.new(1, -20, 0, 24),
+		Position = UDim2.new(0, 14, 0, 28),
+		Size = UDim2.new(1, -24, 0, 24),
 		Parent = card,
 	})
 	
+	-- Countdown Progress Line
+	local prog = Create("Frame", {
+		BackgroundColor3 = accent,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 1, -2),
+		Size = UDim2.new(1, 0, 0, 2),
+		Parent = card,
+	})
+	Tween(prog, { Size = UDim2.new(0, 0, 0, 2) }, duration, Enum.EasingStyle.Linear)
+	
 	task.delay(duration, function()
 		if card and card.Parent then
-			local tw = Tween(card, { BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0) }, 0.22)
+			local tw = Tween(card, { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1 }, 0.22)
 			tw.Completed:Connect(function() card:Destroy() end)
 		end
 	end)
@@ -219,66 +309,53 @@ end
 function Vanta:StartAuthPipeline(config, onAuthenticated)
 	self:InitRoot()
 	config = config or {}
-	local title = config.Title or "VANTA // SUITE"
+	local title = config.Title or "VANTA // NOVA"
 	local validKeys = config.Keys or { "vanta-vip", "free", "test" }
 	local keyLink = config.KeyLink or "https://discord.gg/vibe"
 	local saveFile = config.SaveKeyName or "VantaLicense.txt"
 	
-	-- Backdrop
+	-- Frosted Backdrop
 	local backdrop = Create("Frame", {
 		Name = "AuthBackdrop",
-		BackgroundColor3 = Color3.fromRGB(4, 5, 8),
+		BackgroundColor3 = Color3.fromRGB(6, 7, 10),
 		BackgroundTransparency = 1,
 		Size = UDim2.new(1, 0, 1, 0),
 		ZIndex = 2000,
 		Parent = self.ScreenGui,
 	})
-	Tween(backdrop, { BackgroundTransparency = 0.4 }, 0.3)
+	Tween(backdrop, { BackgroundTransparency = 0.35 }, 0.3)
 	
-	-- Central Card
+	-- Central Glass Card
 	local card = Create("Frame", {
-		Name = "PipelineCard",
+		Name = "AuthCard",
 		BackgroundColor3 = Theme.Background,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0.5, 0),
-		Size = UDim2.new(0, 360, 0, 190),
+		Size = UDim2.new(0, 380, 0, 200),
 		ClipsDescendants = true,
 		Parent = backdrop,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 10), Parent = card })
-	local cardStroke = Create("UIStroke", { Color = Theme.Border, Thickness = 1.2, Parent = card })
+	AddCorner(card, 12)
+	local stroke = AddStroke(card, Theme.Border, 1.2)
+	AddBevelGradient(stroke)
+	AddShadow(card, 22)
 	
-	-- Accent Top Line
-	local topLine = Create("Frame", {
+	-- Top Accent Line
+	Create("Frame", {
 		BackgroundColor3 = Theme.Accent,
 		BorderSizePixel = 0,
 		Size = UDim2.new(1, 0, 0, 3),
 		Parent = card,
 	})
 	
-	-- Drop Shadow
-	Create("ImageLabel", {
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://6015897843",
-		ImageColor3 = Color3.fromRGB(0, 0, 0),
-		ImageTransparency = 0.35,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(49, 49, 450, 450),
-		Position = UDim2.new(0, -20, 0, -20),
-		Size = UDim2.new(1, 40, 1, 40),
-		ZIndex = card.ZIndex - 1,
-		Parent = card,
-	})
-	
-	-- Card Header
-	local headerLbl = Create("TextLabel", {
+	local titleLbl = Create("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = string.upper(title),
 		TextColor3 = Theme.Text,
 		Font = Enum.Font.GothamBlack,
 		TextSize = 16,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.new(0, 0, 0, 18),
+		Position = UDim2.new(0, 0, 0, 20),
 		Size = UDim2.new(1, 0, 0, 20),
 		Parent = card,
 	})
@@ -290,19 +367,19 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 		Font = Enum.Font.GothamBold,
 		TextSize = 10,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.new(0, 0, 0, 38),
+		Position = UDim2.new(0, 0, 0, 42),
 		Size = UDim2.new(1, 0, 0, 14),
 		Parent = card,
 	})
 	
-	---------------------------------------------------------------------
-	-- STAGE 1: LOADING (RUNS BEFORE LOGIN AS REQUESTED)
-	---------------------------------------------------------------------
-	local loadContainer = Create("Frame", {
+	-----------------------------------------------------------------
+	-- STAGE 1: ANIMATED PRE-LOADER (RUNS BEFORE LOGIN)
+	-----------------------------------------------------------------
+	local loaderBox = Create("Frame", {
 		Name = "Stage1_Loader",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 24, 0, 68),
-		Size = UDim2.new(1, -48, 1, -80),
+		Position = UDim2.new(0, 28, 0, 75),
+		Size = UDim2.new(1, -56, 1, -85),
 		Parent = card,
 	})
 	
@@ -313,46 +390,46 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 		Font = Enum.Font.GothamMedium,
 		TextSize = 11,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.new(0, 0, 0, 10),
+		Position = UDim2.new(0, 0, 0, 12),
 		Size = UDim2.new(1, 0, 0, 18),
-		Parent = loadContainer,
+		Parent = loaderBox,
 	})
 	
 	local loadTrack = Create("Frame", {
-		BackgroundColor3 = Theme.Header,
-		Position = UDim2.new(0, 0, 0, 42),
+		BackgroundColor3 = Theme.Input,
+		Position = UDim2.new(0, 0, 0, 46),
 		Size = UDim2.new(1, 0, 0, 8),
-		Parent = loadContainer,
+		Parent = loaderBox,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = loadTrack })
+	AddCorner(loadTrack, 4)
 	
 	local loadFill = Create("Frame", {
 		BackgroundColor3 = Theme.Accent,
 		Size = UDim2.new(0, 0, 1, 0),
 		Parent = loadTrack,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = loadFill })
+	AddCorner(loadFill, 4)
 	
-	---------------------------------------------------------------------
-	-- STAGE 2: LOGIN WINDOW (SHOWN AFTER PRE-LOADER FINISHES)
-	---------------------------------------------------------------------
-	local loginContainer = Create("Frame", {
+	-----------------------------------------------------------------
+	-- STAGE 2: KEY LOGIN WINDOW
+	-----------------------------------------------------------------
+	local loginBox = Create("Frame", {
 		Name = "Stage2_Login",
 		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 24, 0, 68),
-		Size = UDim2.new(1, -48, 1, -80),
+		Position = UDim2.new(0, 28, 0, 75),
+		Size = UDim2.new(1, -56, 1, -85),
 		Visible = false,
 		Parent = card,
 	})
 	
-	local boxBg = Create("Frame", {
-		BackgroundColor3 = Theme.Header,
+	local inputFrame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
 		Position = UDim2.new(0, 0, 0, 4),
-		Size = UDim2.new(1, 0, 0, 36),
-		Parent = loginContainer,
+		Size = UDim2.new(1, 0, 0, 38),
+		Parent = loginBox,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = boxBg })
-	Create("UIStroke", { Color = Theme.Border, Thickness = 1, Parent = boxBg })
+	AddCorner(inputFrame, 8)
+	AddStroke(inputFrame, Theme.Border, 1)
 	
 	local keyBox = Create("TextBox", {
 		BackgroundTransparency = 1,
@@ -363,24 +440,24 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 		TextSize = 12,
 		Text = "",
 		ClearTextOnFocus = false,
-		Position = UDim2.new(0, 10, 0, 0),
-		Size = UDim2.new(1, -70, 1, 0),
-		Parent = boxBg,
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(1, -80, 1, 0),
+		Parent = inputFrame,
 	})
 	
 	local pasteBtn = Create("TextButton", {
 		Text = "PASTE",
 		TextColor3 = Theme.Accent,
 		Font = Enum.Font.GothamBold,
-		TextSize = 9,
-		BackgroundColor3 = Theme.SubHeader,
+		TextSize = 10,
+		BackgroundColor3 = Theme.Card,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -6, 0.5, 0),
-		Size = UDim2.new(0, 48, 0, 24),
+		Size = UDim2.new(0, 50, 0, 26),
 		AutoButtonColor = false,
-		Parent = boxBg,
+		Parent = inputFrame,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = pasteBtn })
+	AddCorner(pasteBtn, 6)
 	pasteBtn.MouseButton1Click:Connect(function()
 		pcall(function()
 			if getclipboard then keyBox.Text = getclipboard() end
@@ -392,14 +469,14 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 		TextColor3 = Theme.TextMuted,
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
-		BackgroundColor3 = Theme.Header,
-		Position = UDim2.new(0, 0, 0, 48),
-		Size = UDim2.new(0.48, 0, 0, 32),
+		BackgroundColor3 = Theme.Card,
+		Position = UDim2.new(0, 0, 0, 52),
+		Size = UDim2.new(0.48, 0, 0, 34),
 		AutoButtonColor = false,
-		Parent = loginContainer,
+		Parent = loginBox,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = getBtn })
-	Create("UIStroke", { Color = Theme.Border, Thickness = 1, Parent = getBtn })
+	AddCorner(getBtn, 6)
+	AddStroke(getBtn, Theme.Border, 1)
 	
 	local unlockBtn = Create("TextButton", {
 		Text = "UNLOCK",
@@ -407,23 +484,23 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
 		BackgroundColor3 = Theme.Accent,
-		Position = UDim2.new(0.52, 0, 0, 48),
-		Size = UDim2.new(0.48, 0, 0, 32),
+		Position = UDim2.new(0.52, 0, 0, 52),
+		Size = UDim2.new(0.48, 0, 0, 34),
 		AutoButtonColor = false,
-		Parent = loginContainer,
+		Parent = loginBox,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = unlockBtn })
+	AddCorner(unlockBtn, 6)
 	
 	getBtn.MouseButton1Click:Connect(function()
 		if setclipboard then
 			setclipboard(keyLink)
-			Vanta:Notify({ Title = "Link Copied", Content = keyLink, Type = "Info", Duration = 3.5 })
+			Vanta:Notify({ Title = "Link Copied", Content = keyLink, Type = "Info", Duration = 3 })
 		else
 			Vanta:Notify({ Title = "Key Link", Content = keyLink, Type = "Info", Duration = 4 })
 		end
 	end)
 	
-	-- Auto-check saved key from disk
+	-- Check saved key
 	pcall(function()
 		if readfile and isfile and isfile(saveFile) then
 			local saved = readfile(saveFile)
@@ -431,14 +508,14 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 		end
 	end)
 	
-	-- Run Stage 1 Loading -> then Transition to Login
+	-- Run Stage 1 Animation
 	task.spawn(function()
-		local preStages = {
+		local stages = {
 			{ Text = "[1/3] CONNECTING TO SECURE AUTH SERVER...", Pct = 0.35, Dur = 0.4 },
 			{ Text = "[2/3] FETCHING HARDWARE MANIFEST...", Pct = 0.70, Dur = 0.45 },
 			{ Text = "[3/3] MOUNTING AUTHENTICATION GATE...", Pct = 1.00, Dur = 0.35 },
 		}
-		for _, st in ipairs(preStages) do
+		for _, st in ipairs(stages) do
 			loadStatus.Text = st.Text
 			Tween(loadFill, { Size = UDim2.new(st.Pct, 0, 1, 0) }, st.Dur, Enum.EasingStyle.Sine)
 			task.wait(st.Dur + 0.08)
@@ -446,20 +523,16 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 		
 		task.wait(0.2)
 		subLbl.Text = "LICENSE VERIFICATION"
-		loadContainer.Visible = false
-		loginContainer.Visible = true
-		Tween(card, { Size = UDim2.new(0, 360, 0, 185) }, 0.2)
+		loaderBox.Visible = false
+		loginBox.Visible = true
 	end)
 	
-	-- Verification Logic
+	-- Verification Handler
 	local function AttemptUnlock()
 		local entered = keyBox.Text:gsub("%s+", "")
 		local isValid = false
 		for _, k in ipairs(validKeys) do
-			if entered == k then
-				isValid = true
-				break
-			end
+			if entered == k then isValid = true; break end
 		end
 		
 		if isValid then
@@ -467,30 +540,37 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 				if writefile then writefile(saveFile, entered) end
 			end)
 			
-			-- Stage 3: Instant Decrypt & Finish
-			loginContainer.Visible = false
-			loadContainer.Visible = true
+			loginBox.Visible = false
+			loaderBox.Visible = true
 			subLbl.Text = "ACCESS GRANTED"
 			subLbl.TextColor3 = Theme.Success
-			loadStatus.Text = "DECRYPTING CORNER MENU MODULES..."
+			loadStatus.Text = "DECRYPTING VANTA NOVA MODULES..."
 			loadStatus.TextColor3 = Theme.Success
 			loadFill.BackgroundColor3 = Theme.Success
 			loadFill.Size = UDim2.new(0, 0, 1, 0)
 			Tween(loadFill, { Size = UDim2.new(1, 0, 1, 0) }, 0.4, Enum.EasingStyle.Sine)
 			
 			task.wait(0.5)
-			Tween(card, { Size = UDim2.new(0, 380, 0, 200), BackgroundTransparency = 1 }, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+			Tween(card, { Size = UDim2.new(0, 410, 0, 220), BackgroundTransparency = 1 }, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
 			local tw = Tween(backdrop, { BackgroundTransparency = 1 }, 0.3)
 			tw.Completed:Connect(function()
 				backdrop:Destroy()
 				if onAuthenticated then onAuthenticated() end
 			end)
 		else
-			Shake(card, UDim2.new(0.5, 0, 0.5, 0))
-			Tween(cardStroke, { Color = Theme.Error }, 0.1)
-			Vanta:Notify({ Title = "Invalid License", Content = "The key entered is invalid.", Type = "Error", Duration = 3 })
+			-- Shake error
+			task.spawn(function()
+				local orig = UDim2.new(0.5, 0, 0.5, 0)
+				local steps = { -10, 8, -6, 4, -2, 0 }
+				for _, off in ipairs(steps) do
+					Tween(card, { Position = UDim2.new(orig.X.Scale, orig.X.Offset + off, orig.Y.Scale, orig.Y.Offset) }, 0.04)
+					task.wait(0.04)
+				end
+			end)
+			Tween(stroke, { Color = Theme.Error }, 0.1)
+			Vanta:Notify({ Title = "Invalid License", Content = "The key entered is invalid or expired.", Type = "Error", Duration = 3 })
 			task.delay(0.6, function()
-				Tween(cardStroke, { Color = Theme.Border }, 0.25)
+				Tween(stroke, { Color = Theme.Border }, 0.25)
 			end)
 		end
 	end
@@ -501,258 +581,305 @@ function Vanta:StartAuthPipeline(config, onAuthenticated)
 	end)
 end
 
--- [6] GTA V CORNER MENU
-local Menu = {}
-Menu.__index = Menu
+-- [6] MODERN WINDOW CLASS
+local Window = {}
+Window.__index = Window
 
-function Vanta:CreateMenu(config)
+function Vanta:CreateWindow(config)
 	self:InitRoot()
 	config = config or {}
 	local title = config.Title or "VANTA"
-	local subTitle = config.SubTitle or "GTA V CORNER SUITE"
-	local toggleKey = config.ToggleKey or Enum.KeyCode.Insert
+	local subTitle = config.SubTitle or "NOVA SUITE"
+	local size = config.Size or UDim2.new(0, 680, 0, 450)
+	local toggleKey = config.ToggleKey or Enum.KeyCode.RightControl
 	local useKeySystem = config.KeySystem ~= nil
 	self.ToggleKey = toggleKey
 	
-	local menu = setmetatable({
+	local win = setmetatable({
 		Title = title,
 		SubTitle = subTitle,
+		DefaultSize = size,
 		Tabs = {},
-		ActiveTabIndex = 1,
-		ActiveRowIndex = 1,
+		ActiveTab = nil,
 		Flags = self.Flags,
-	}, Menu)
-	self.CurrentMenu = menu
+	}, Window)
+	self.CurrentWindow = win
 	
-	-- Corner Root Frame (Top-Left Dock)
-	local root = Create("Frame", {
-		Name = "VantaGTAV_Menu",
+	-- Main Floating Window Frame
+	local main = Create("Frame", {
+		Name = "VantaNova_Window",
 		BackgroundColor3 = Theme.Background,
-		Position = UDim2.new(0, 20, 0, 20),
-		Size = UDim2.new(0, 320, 0, 460),
-		ClipsDescendants = true,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		Size = size,
+		ClipsDescendants = false,
 		Parent = self.ScreenGui,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 8), Parent = root })
-	Create("UIStroke", { Color = Theme.Border, Thickness = 1.2, Parent = root })
+	AddCorner(main, 12)
+	local winStroke = AddStroke(main, Theme.Border, 1)
+	AddBevelGradient(winStroke)
+	AddShadow(main, 20)
 	
-	-- Shadow
-	Create("ImageLabel", {
-		Name = "Shadow",
+	win.MainFrame = main
+	
+	-- 1. LEFT NAVIGATION RAIL (Sidebar)
+	local sidebar = Create("Frame", {
+		Name = "Sidebar",
+		BackgroundColor3 = Theme.Sidebar,
+		Size = UDim2.new(0, 185, 1, 0),
+		Parent = main,
+	})
+	AddCorner(sidebar, 12)
+	
+	-- Cover right corners of sidebar
+	local sideCover = Create("Frame", {
+		BackgroundColor3 = Theme.Sidebar,
+		BorderSizePixel = 0,
+		Position = UDim2.new(1, -8, 0, 0),
+		Size = UDim2.new(0, 8, 1, 0),
+		Parent = sidebar,
+	})
+	
+	-- Sidebar Divider Line
+	Create("Frame", {
+		BackgroundColor3 = Theme.Border,
+		BorderSizePixel = 0,
+		Position = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.new(0, 1, 1, 0),
+		Parent = sidebar,
+	})
+	
+	-- Brand Header (Top of Sidebar)
+	local brandBox = Create("Frame", {
 		BackgroundTransparency = 1,
-		Image = "rbxassetid://6015897843",
-		ImageColor3 = Color3.fromRGB(0, 0, 0),
-		ImageTransparency = 0.35,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = Rect.new(49, 49, 450, 450),
-		Position = UDim2.new(0, -18, 0, -18),
-		Size = UDim2.new(1, 36, 1, 36),
-		ZIndex = root.ZIndex - 1,
-		Parent = root,
+		Position = UDim2.new(0, 16, 0, 14),
+		Size = UDim2.new(1, -32, 0, 36),
+		Parent = sidebar,
 	})
-	menu.RootFrame = root
-	
-	-- 1. GTA V BANNER HEADER
-	local banner = Create("Frame", {
-		Name = "Banner",
-		BackgroundColor3 = Theme.Banner,
-		Size = UDim2.new(1, 0, 0, 68),
-		Parent = root,
-	})
-	Create("Frame", { BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 3), Parent = banner })
 	
 	Create("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = string.upper(title),
 		TextColor3 = Theme.Text,
 		Font = Enum.Font.GothamBlack,
-		TextSize = 22,
+		TextSize = 16,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 16, 0, 14),
-		Size = UDim2.new(1, -32, 0, 24),
-		Parent = banner,
+		Position = UDim2.new(0, 0, 0, 0),
+		Size = UDim2.new(1, -45, 0, 20),
+		Parent = brandBox,
 	})
+	
+	-- Version Capsule Badge
+	local verBadge = Create("TextLabel", {
+		BackgroundColor3 = Theme.Card,
+		Text = "v3.0",
+		TextColor3 = Theme.Accent,
+		Font = Enum.Font.GothamBold,
+		TextSize = 10,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 0, 2),
+		Size = UDim2.new(0, 36, 0, 18),
+		Parent = brandBox,
+	})
+	AddCorner(verBadge, 4)
+	AddStroke(verBadge, Theme.Border, 1)
 	
 	Create("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = string.upper(subTitle),
-		TextColor3 = Theme.Accent,
+		TextColor3 = Theme.TextDark,
 		Font = Enum.Font.GothamBold,
-		TextSize = 10,
+		TextSize = 9,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 16, 0, 40),
-		Size = UDim2.new(1, -32, 0, 14),
-		Parent = banner,
+		Position = UDim2.new(0, 0, 0, 20),
+		Size = UDim2.new(1, 0, 0, 14),
+		Parent = brandBox,
 	})
 	
-	-- 2. TAB SELECTOR BAR (Q / E)
-	local tabSelector = Create("Frame", {
-		Name = "TabSelector",
-		BackgroundColor3 = Theme.SubHeader,
-		Position = UDim2.new(0, 0, 0, 68),
-		Size = UDim2.new(1, 0, 0, 32),
-		Parent = root,
-	})
-	
-	Create("TextLabel", {
-		BackgroundTransparency = 1,
-		Text = "[Q]",
-		TextColor3 = Theme.TextMuted,
-		Font = Enum.Font.GothamBold,
-		TextSize = 11,
-		Position = UDim2.new(0, 6, 0, 0),
-		Size = UDim2.new(0, 24, 1, 0),
-		Parent = tabSelector,
-	})
-	
-	Create("TextLabel", {
-		BackgroundTransparency = 1,
-		Text = "[E]",
-		TextColor3 = Theme.TextMuted,
-		Font = Enum.Font.GothamBold,
-		TextSize = 11,
-		Position = UDim2.new(1, -30, 0, 0),
-		Size = UDim2.new(0, 24, 1, 0),
-		Parent = tabSelector,
-	})
-	
-	local curTabLbl = Create("TextLabel", {
-		BackgroundTransparency = 1,
-		Text = "TAB",
-		TextColor3 = Theme.Text,
-		Font = Enum.Font.GothamBold,
-		TextSize = 12,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.new(0, 32, 0, 0),
-		Size = UDim2.new(1, -64, 1, 0),
-		Parent = tabSelector,
-	})
-	menu.CurrentTabLabel = curTabLbl
-	
-	-- 3. SUBHEADER BREADCRUMB & COUNTER
-	local subHeader = Create("Frame", {
-		Name = "SubHeader",
-		BackgroundColor3 = Theme.Header,
-		Position = UDim2.new(0, 0, 0, 100),
-		Size = UDim2.new(1, 0, 0, 24),
-		Parent = root,
-	})
-	
-	local pathLbl = Create("TextLabel", {
-		BackgroundTransparency = 1,
-		Text = "MENU",
-		TextColor3 = Theme.Accent,
-		Font = Enum.Font.GothamBold,
-		TextSize = 10,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 12, 0, 0),
-		Size = UDim2.new(0.6, 0, 1, 0),
-		Parent = subHeader,
-	})
-	menu.PathLabel = pathLbl
-	
-	local counterLbl = Create("TextLabel", {
-		BackgroundTransparency = 1,
-		Text = "1 / 1",
-		TextColor3 = Theme.TextMuted,
-		Font = Enum.Font.GothamBold,
-		TextSize = 10,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Position = UDim2.new(0.6, 0, 0, 0),
-		Size = UDim2.new(0.4, -12, 1, 0),
-		Parent = subHeader,
-	})
-	menu.CounterLabel = counterLbl
-	
-	-- 4. ITEMS CONTAINER
-	local itemsFrame = Create("ScrollingFrame", {
-		Name = "Items",
+	-- Tabs Scrolling List
+	local tabList = Create("ScrollingFrame", {
+		Name = "TabList",
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 2,
 		ScrollBarImageColor3 = Theme.BorderLight,
-		Position = UDim2.new(0, 0, 0, 124),
-		Size = UDim2.new(1, 0, 0, 248),
+		Position = UDim2.new(0, 10, 0, 60),
+		Size = UDim2.new(1, -20, 1, -125),
 		CanvasSize = UDim2.new(0, 0, 0, 0),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		Parent = root,
+		Parent = sidebar,
 	})
-	Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 0), Parent = itemsFrame })
-	menu.ItemsContainer = itemsFrame
+	Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6), Parent = tabList })
+	win.TabList = tabList
 	
-	-- 5. TOOLTIP / DESCRIPTION FOOTER BOX
-	local footerBox = Create("Frame", {
-		Name = "Footer",
-		BackgroundColor3 = Theme.SubHeader,
-		Position = UDim2.new(0, 0, 1, -54),
-		Size = UDim2.new(1, 0, 0, 34),
-		Parent = root,
+	-- Player Profile Dock (Bottom of Sidebar)
+	local profileDock = Create("Frame", {
+		Name = "ProfileDock",
+		BackgroundColor3 = Theme.Card,
+		Position = UDim2.new(0, 10, 1, -55),
+		Size = UDim2.new(1, -20, 0, 45),
+		Parent = sidebar,
 	})
-	Create("Frame", { BackgroundColor3 = Theme.Border, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 1), Parent = footerBox })
+	AddCorner(profileDock, 8)
+	AddStroke(profileDock, Theme.Border, 1)
 	
-	local descLbl = Create("TextLabel", {
+	local avatarImg = Create("ImageLabel", {
+		BackgroundColor3 = Theme.Input,
+		Position = UDim2.new(0, 8, 0.5, -14),
+		Size = UDim2.new(0, 28, 0, 28),
+		Parent = profileDock,
+	})
+	AddCorner(avatarImg, 14)
+	
+	-- Load headshot async
+	task.spawn(function()
+		pcall(function()
+			if LocalPlayer then
+				local content = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+				avatarImg.Image = content
+			end
+		end)
+	end)
+	
+	local nameLbl = Create("TextLabel", {
 		BackgroundTransparency = 1,
-		Text = "Select an item to view description.",
-		TextColor3 = Theme.TextMuted,
-		Font = Enum.Font.Gotham,
-		TextSize = 10,
-		TextWrapped = true,
+		Text = LocalPlayer and LocalPlayer.DisplayName or "User",
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 11,
+		TextTruncate = Enum.TextTruncate.AtEnd,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 12, 0, 4),
-		Size = UDim2.new(1, -24, 1, -8),
-		Parent = footerBox,
+		Position = UDim2.new(0, 42, 0, 8),
+		Size = UDim2.new(1, -60, 0, 14),
+		Parent = profileDock,
 	})
-	menu.DescLabel = descLbl
 	
-	-- 6. KEYBOARD LEGEND BAR
-	local legendBar = Create("Frame", {
-		Name = "Legend",
-		BackgroundColor3 = Theme.Background,
-		Position = UDim2.new(0, 0, 1, -20),
-		Size = UDim2.new(1, 0, 0, 20),
-		Parent = root,
+	-- Live Ping & Status Dot
+	local statusDot = Create("Frame", {
+		BackgroundColor3 = Theme.Success,
+		Position = UDim2.new(0, 42, 0, 26),
+		Size = UDim2.new(0, 6, 0, 6),
+		Parent = profileDock,
 	})
-	Create("TextLabel", {
+	AddCorner(statusDot, 3)
+	
+	local statusLbl = Create("TextLabel", {
 		BackgroundTransparency = 1,
-		Text = "[W/S] Move   [A/D] Adjust   [Enter] Select   [Q/E] Tabs",
+		Text = "CONNECTED",
 		TextColor3 = Theme.TextDark,
 		Font = Enum.Font.GothamBold,
 		TextSize = 9,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		Size = UDim2.new(1, 0, 1, 0),
-		Parent = legendBar,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 52, 0, 22),
+		Size = UDim2.new(1, -65, 0, 14),
+		Parent = profileDock,
 	})
 	
-	menu:SetupInputHooks()
+	-- 2. TOPBAR HEADER (Draggable)
+	local topbar = Create("Frame", {
+		Name = "Topbar",
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 185, 0, 0),
+		Size = UDim2.new(1, -185, 0, 48),
+		Parent = main,
+	})
+	MakeDraggable(topbar, main)
+	
+	-- Instant Search Filter Box
+	local searchFrame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
+		Position = UDim2.new(0, 16, 0.5, -14),
+		Size = UDim2.new(0, 200, 0, 28),
+		Parent = topbar,
+	})
+	AddCorner(searchFrame, 6)
+	AddStroke(searchFrame, Theme.Border, 1)
+	
+	local searchIcon = Create("ImageLabel", {
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://10734950117",
+		ImageColor3 = Theme.TextDark,
+		Position = UDim2.new(0, 8, 0.5, -6),
+		Size = UDim2.new(0, 12, 0, 12),
+		Parent = searchFrame,
+	})
+	
+	local searchInput = Create("TextBox", {
+		BackgroundTransparency = 1,
+		PlaceholderText = "Search controls...",
+		PlaceholderColor3 = Theme.TextDark,
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.Gotham,
+		TextSize = 11,
+		Text = "",
+		ClearTextOnFocus = false,
+		Position = UDim2.new(0, 26, 0, 0),
+		Size = UDim2.new(1, -30, 1, 0),
+		Parent = searchFrame,
+	})
+	
+	searchInput:GetPropertyChangedSignal("Text"):Connect(function()
+		local query = searchInput.Text:lower()
+		if win.ActiveTab then
+			win.ActiveTab:Filter(query)
+		end
+	end)
+	
+	-- Window Action Controls (Close / Hide)
+	local closeBtn = Create("TextButton", {
+		Text = "×",
+		TextColor3 = Theme.TextMuted,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 18,
+		BackgroundColor3 = Theme.Card,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -16, 0.5, 0),
+		Size = UDim2.new(0, 26, 0, 26),
+		AutoButtonColor = false,
+		Parent = topbar,
+	})
+	AddCorner(closeBtn, 6)
+	AddStroke(closeBtn, Theme.Border, 1)
+	closeBtn.MouseButton1Click:Connect(function()
+		Vanta:Toggle()
+	end)
+	
+	-- 3. CONTENT PAGES CONTAINER
+	local content = Create("Frame", {
+		Name = "ContentContainer",
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 195, 0, 52),
+		Size = UDim2.new(1, -205, 1, -62),
+		ClipsDescendants = true,
+		Parent = main,
+	})
+	win.ContentContainer = content
 	
 	-- Pre-Login Loading Pipeline
 	if useKeySystem then
-		root.Position = UDim2.new(0, -340, 0, 20)
+		main.Visible = false
 		Vanta:StartAuthPipeline(config.KeySystem, function()
-			Tween(root, { Position = UDim2.new(0, 20, 0, 20) }, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			main.Visible = true
+			main.Size = UDim2.new(0, size.X.Offset * 0.9, 0, size.Y.Offset * 0.9)
+			Tween(main, { Size = size }, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		end)
 	else
-		-- Direct slide-in
-		Tween(root, { Position = UDim2.new(0, 20, 0, 20) }, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		main.Size = UDim2.new(0, size.X.Offset * 0.9, 0, size.Y.Offset * 0.9)
+		Tween(main, { Size = size }, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	end
 	
-	return menu
-end
-
--- Backward compatibility alias
-function Vanta:CreateWindow(config)
-	return self:CreateMenu(config)
+	return win
 end
 
 function Vanta:Toggle()
 	self.Open = not self.Open
-	if self.CurrentMenu and self.CurrentMenu.RootFrame then
-		local frame = self.CurrentMenu.RootFrame
+	if self.CurrentWindow and self.CurrentWindow.MainFrame then
+		local frame = self.CurrentWindow.MainFrame
 		if self.Open then
 			frame.Visible = true
-			Tween(frame, { Position = UDim2.new(0, 20, 0, 20) }, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+			Tween(frame, { Size = self.CurrentWindow.DefaultSize }, 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 		else
-			local tw = Tween(frame, { Position = UDim2.new(0, -340, 0, 20) }, 0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			local tw = Tween(frame, { Size = UDim2.new(0, self.CurrentWindow.DefaultSize.X.Offset * 0.92, 0, self.CurrentWindow.DefaultSize.Y.Offset * 0.92) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 			tw.Completed:Connect(function()
 				if not self.Open then frame.Visible = false end
 			end)
@@ -760,261 +887,349 @@ function Vanta:Toggle()
 	end
 end
 
--- [7] WASD / ARROW INPUT HOOKS
-function Menu:SetupInputHooks()
-	UserInputService.InputBegan:Connect(function(input, gpe)
-		if (gpe and UserInputService:GetFocusedTextBox()) or not Vanta.Open then return end
-		
-		local currentTab = self.Tabs[self.ActiveTabIndex]
-		local count = currentTab and #currentTab.Rows or 0
-		
-		if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.Up then
-			if count > 0 then
-				self.ActiveRowIndex = self.ActiveRowIndex - 1
-				if self.ActiveRowIndex < 1 then self.ActiveRowIndex = count end
-				self:UpdateSelection()
-			end
-		elseif input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.Down then
-			if count > 0 then
-				self.ActiveRowIndex = self.ActiveRowIndex + 1
-				if self.ActiveRowIndex > count then self.ActiveRowIndex = 1 end
-				self:UpdateSelection()
-			end
-		elseif input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.Left then
-			if currentTab and currentTab.Rows[self.ActiveRowIndex] then
-				local row = currentTab.Rows[self.ActiveRowIndex]
-				if row.OnLeft then row:OnLeft() end
-			end
-		elseif input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.Right then
-			if currentTab and currentTab.Rows[self.ActiveRowIndex] then
-				local row = currentTab.Rows[self.ActiveRowIndex]
-				if row.OnRight then row:OnRight() end
-			end
-		elseif input.KeyCode == Enum.KeyCode.Return or input.KeyCode == Enum.KeyCode.Space then
-			if currentTab and currentTab.Rows[self.ActiveRowIndex] then
-				local row = currentTab.Rows[self.ActiveRowIndex]
-				if row.OnActivate then row:OnActivate() end
-			end
-		elseif input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.LeftBracket then
-			if #self.Tabs > 1 then
-				local newIdx = self.ActiveTabIndex - 1
-				if newIdx < 1 then newIdx = #self.Tabs end
-				self:SelectTab(newIdx)
-			end
-		elseif input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.RightBracket then
-			if #self.Tabs > 1 then
-				local newIdx = self.ActiveTabIndex + 1
-				if newIdx > #self.Tabs then newIdx = 1 end
-				self:SelectTab(newIdx)
-			end
-		end
-	end)
-end
-
-function Menu:UpdateSelection()
-	local currentTab = self.Tabs[self.ActiveTabIndex]
-	if not currentTab then return end
-	local rows = currentTab.Rows
-	self.CounterLabel.Text = tostring(self.ActiveRowIndex) .. " / " .. tostring(#rows)
-	
-	for idx, row in ipairs(rows) do
-		local isSel = (idx == self.ActiveRowIndex)
-		if row.SetSelected then row:SetSelected(isSel) end
-		if isSel then self.DescLabel.Text = row.Description or (row.Title .. " option") end
-	end
-end
-
--- [8] TAB & CONTROLS CLASS
+-- [7] TAB CLASS
 local Tab = {}
 Tab.__index = Tab
 
-function Menu:CreateTab(config)
+function Window:CreateTab(config)
 	config = config or {}
-	local title = config.Title or config.Name or "TAB"
-	local tab = setmetatable({ Title = title, Menu = self, Rows = {} }, Tab)
+	local title = config.Title or config.Name or "Tab"
+	local icon = config.Icon
+	
+	local tab = setmetatable({
+		Title = title,
+		Window = self,
+		Cards = {},
+	}, Tab)
+	
+	-- Sidebar Navigation Capsule Button
+	local tabBtn = Create("TextButton", {
+		Name = "Tab_" .. title,
+		BackgroundColor3 = Theme.Input,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, 36),
+		Text = "",
+		AutoButtonColor = false,
+		Parent = self.TabList,
+	})
+	AddCorner(tabBtn, 8)
+	
+	local activePill = Create("Frame", {
+		BackgroundColor3 = Theme.Accent,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, 0.2, 0),
+		Size = UDim2.new(0, 3, 0.6, 0),
+		Visible = false,
+		Parent = tabBtn,
+	})
+	AddCorner(activePill, 2)
+	
+	local label = Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = title,
+		TextColor3 = Theme.TextMuted,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 14, 0, 0),
+		Size = UDim2.new(1, -24, 1, 0),
+		Parent = tabBtn,
+	})
+	
+	tab.Button = tabBtn
+	tab.Label = label
+	tab.ActivePill = activePill
+	
+	-- Page Scrolling Container
+	local page = Create("ScrollingFrame", {
+		Name = "Page_" .. title,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 3,
+		ScrollBarImageColor3 = Theme.BorderLight,
+		Size = UDim2.new(1, 0, 1, 0),
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		Visible = false,
+		Parent = self.ContentContainer,
+	})
+	Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 12), Parent = page })
+	Create("UIPadding", { PaddingRight = UDim.new(0, 8), PaddingBottom = UDim.new(0, 12), Parent = page })
+	tab.Page = page
+	
+	tabBtn.MouseButton1Click:Connect(function()
+		self:SelectTab(tab)
+	end)
+	
 	table.insert(self.Tabs, tab)
-	if #self.Tabs == 1 then self:SelectTab(1) end
+	if #self.Tabs == 1 then
+		self:SelectTab(tab)
+	end
+	
 	return tab
 end
 
-function Menu:SelectTab(index)
-	self.ActiveTabIndex = index
-	self.ActiveRowIndex = 1
-	local tab = self.Tabs[index]
-	if not tab then return end
-	
-	self.CurrentTabLabel.Text = string.upper(tab.Title)
-	self.PathLabel.Text = string.upper(self.Title) .. " > " .. string.upper(tab.Title)
-	
-	for _, child in ipairs(self.ItemsContainer:GetChildren()) do
-		if child:IsA("GuiObject") then child.Visible = false end
+function Window:SelectTab(selected)
+	for _, t in ipairs(self.Tabs) do
+		local isSel = (t == selected)
+		t.Page.Visible = isSel
+		t.ActivePill.Visible = isSel
+		
+		if isSel then
+			Tween(t.Button, { BackgroundTransparency = 0.82, BackgroundColor3 = Theme.Accent }, 0.2)
+			Tween(t.Label, { TextColor3 = Theme.Text }, 0.2)
+			t.Label.Font = Enum.Font.GothamBold
+		else
+			Tween(t.Button, { BackgroundTransparency = 1 }, 0.2)
+			Tween(t.Label, { TextColor3 = Theme.TextMuted }, 0.2)
+			t.Label.Font = Enum.Font.GothamMedium
+		end
 	end
-	for _, row in ipairs(tab.Rows) do
-		if row.Frame then row.Frame.Visible = true end
-	end
-	self:UpdateSelection()
+	self.ActiveTab = selected
 end
+
+function Tab:Filter(query)
+	for _, card in ipairs(self.Cards) do
+		local cardVisible = false
+		for _, row in ipairs(card.Rows) do
+			if query == "" or row.Title:lower():find(query, 1, true) then
+				row.Frame.Visible = true
+				cardVisible = true
+			else
+				row.Frame.Visible = false
+			end
+		end
+		card.Frame.Visible = cardVisible
+	end
+end
+
+-- [8] SECTION CARD (GroupBox)
+local Card = {}
+Card.__index = Card
 
 function Tab:CreateSection(title)
-	self:AddSeparator({ Title = title })
-	return self
-end
-
-function Tab:AddSeparator(config)
-	config = config or {}
+	local card = setmetatable({
+		Title = title,
+		Tab = self,
+		Rows = {},
+	}, Card)
+	
 	local frame = Create("Frame", {
-		Name = "Separator",
-		BackgroundColor3 = Theme.SubHeader,
-		Size = UDim2.new(1, 0, 0, 22),
-		BorderSizePixel = 0,
-		Parent = self.Menu.ItemsContainer,
+		Name = "Card_" .. title,
+		BackgroundColor3 = Theme.Card,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Parent = self.Page,
 	})
-	Create("TextLabel", {
-		BackgroundTransparency = 1,
-		Text = string.upper(config.Title or "CATEGORY"),
-		TextColor3 = Theme.Accent,
-		Font = Enum.Font.GothamBold,
-		TextSize = 10,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 12, 0, 0),
-		Size = UDim2.new(1, -24, 1, 0),
+	AddCorner(frame, 10)
+	local stroke = AddStroke(frame, Theme.Border, 1)
+	AddBevelGradient(stroke)
+	
+	-- Header Banner
+	local header = Create("Frame", {
+		BackgroundColor3 = Theme.CardHeader,
+		Size = UDim2.new(1, 0, 0, 32),
 		Parent = frame,
 	})
-	frame.Visible = (self.Menu.Tabs[self.Menu.ActiveTabIndex] == self)
-	return frame
-end
-
-function Tab:CreateBaseRow(title, desc)
-	local rowFrame = Create("TextButton", {
-		Name = "Row_" .. title,
-		BackgroundColor3 = Theme.Row,
-		BorderSizePixel = 0,
-		Size = UDim2.new(1, 0, 0, 31),
-		Text = "",
-		AutoButtonColor = false,
-		Parent = self.Menu.ItemsContainer,
-	})
-	Create("Frame", { BackgroundColor3 = Theme.Border, BorderSizePixel = 0, Position = UDim2.new(0, 0, 1, -1), Size = UDim2.new(1, 0, 0, 1), Parent = rowFrame })
+	AddCorner(header, 10)
+	Create("Frame", { BackgroundColor3 = Theme.CardHeader, BorderSizePixel = 0, Position = UDim2.new(0, 0, 1, -6), Size = UDim2.new(1, 0, 0, 6), Parent = header })
 	
-	local arrow = Create("TextLabel", {
+	Create("TextLabel", {
 		BackgroundTransparency = 1,
-		Text = ">",
-		TextColor3 = Theme.RowSelectedText,
+		Text = title,
+		TextColor3 = Theme.Text,
 		Font = Enum.Font.GothamBold,
 		TextSize = 13,
-		Position = UDim2.new(0, 6, 0, 0),
-		Size = UDim2.new(0, 12, 1, 0),
-		Visible = false,
-		Parent = rowFrame,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 14, 0, 0),
+		Size = UDim2.new(1, -28, 1, 0),
+		Parent = header,
 	})
+	
+	local body = Create("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 0, 0, 32),
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Parent = frame,
+	})
+	Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8), Parent = body })
+	Create("UIPadding", {
+		PaddingTop = UDim.new(0, 8),
+		PaddingBottom = UDim.new(0, 10),
+		PaddingLeft = UDim.new(0, 10),
+		PaddingRight = UDim.new(0, 10),
+		Parent = body,
+	})
+	
+	card.Frame = frame
+	card.Container = body
+	table.insert(self.Cards, card)
+	
+	return card
+end
+
+-- [9] MODERN CONTROLS
+
+-- BUTTON
+function Card:CreateButton(config)
+	config = config or {}
+	local title = config.Title or "Button"
+	local desc = config.Description
+	local cb = config.Callback or function() end
+	
+	local h = desc and 44 or 34
+	local btn = Create("TextButton", {
+		BackgroundColor3 = Theme.Input,
+		Size = UDim2.new(1, 0, 0, h),
+		Text = "",
+		AutoButtonColor = false,
+		Parent = self.Container,
+	})
+	AddCorner(btn, 6)
+	AddStroke(btn, Theme.Border, 1)
 	
 	local titleLbl = Create("TextLabel", {
 		BackgroundTransparency = 1,
 		Text = title,
 		TextColor3 = Theme.Text,
 		Font = Enum.Font.GothamMedium,
-		TextSize = 12,
+		TextSize = 13,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.new(0, 14, 0, 0),
-		Size = UDim2.new(0.65, 0, 1, 0),
-		Parent = rowFrame,
+		Position = UDim2.new(0, 12, 0, desc and 6 or 0),
+		Size = UDim2.new(1, -40, 0, desc and 16 or h),
+		Parent = btn,
 	})
 	
-	local rowObj = { Title = title, Description = desc, Frame = rowFrame, TitleLabel = titleLbl, Arrow = arrow, Tab = self }
-	function rowObj:SetSelected(isSelected)
-		if isSelected then
-			Tween(rowFrame, { BackgroundColor3 = Theme.Accent }, 0.12)
-			titleLbl.TextColor3 = Theme.RowSelectedText
-			titleLbl.Font = Enum.Font.GothamBold
-			titleLbl.Position = UDim2.new(0, 20, 0, 0)
-			arrow.Visible = true
-		else
-			Tween(rowFrame, { BackgroundColor3 = Theme.Row }, 0.12)
-			titleLbl.TextColor3 = Theme.Text
-			titleLbl.Font = Enum.Font.GothamMedium
-			titleLbl.Position = UDim2.new(0, 14, 0, 0)
-			arrow.Visible = false
-		end
+	if desc then
+		Create("TextLabel", {
+			BackgroundTransparency = 1,
+			Text = desc,
+			TextColor3 = Theme.TextMuted,
+			Font = Enum.Font.Gotham,
+			TextSize = 11,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Position = UDim2.new(0, 12, 0, 22),
+			Size = UDim2.new(1, -40, 0, 16),
+			Parent = btn,
+		})
 	end
 	
-	rowFrame.MouseEnter:Connect(function()
-		local idx = table.find(self.Rows, rowObj)
-		if idx then
-			self.Menu.ActiveRowIndex = idx
-			self.Menu:UpdateSelection()
-		end
-	end)
-	rowFrame.MouseButton1Click:Connect(function()
-		if rowObj.OnActivate then rowObj:OnActivate() end
-	end)
-	
-	table.insert(self.Rows, rowObj)
-	rowFrame.Visible = (self.Menu.Tabs[self.Menu.ActiveTabIndex] == self)
-	return rowObj
-end
-
--- BUTTON
-function Tab:AddButton(config)
-	config = config or {}
-	local row = self:CreateBaseRow(config.Title or "Button", config.Description)
+	-- Action Chevron Arrow
 	Create("TextLabel", {
 		BackgroundTransparency = 1,
-		Text = "...",
-		TextColor3 = Theme.TextMuted,
+		Text = "→",
+		TextColor3 = Theme.TextDark,
 		Font = Enum.Font.GothamBold,
-		TextSize = 12,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Position = UDim2.new(1, -30, 0, 0),
-		Size = UDim2.new(0, 20, 1, 0),
-		Parent = row.Frame,
+		TextSize = 14,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.new(0, 16, 0, 16),
+		Parent = btn,
 	})
-	function row:OnActivate() task.spawn(config.Callback or function() end) end
-	return row
+	
+	btn.MouseEnter:Connect(function() Tween(btn, { BackgroundColor3 = Theme.InputHover }, 0.15) end)
+	btn.MouseLeave:Connect(function() Tween(btn, { BackgroundColor3 = Theme.Input }, 0.15) end)
+	btn.MouseButton1Down:Connect(function() Tween(btn, { BackgroundColor3 = Theme.AccentDim }, 0.1) end)
+	btn.MouseButton1Up:Connect(function()
+		Tween(btn, { BackgroundColor3 = Theme.InputHover }, 0.1)
+		task.spawn(cb)
+	end)
+	
+	table.insert(self.Rows, { Title = title, Frame = btn })
+	return btn
 end
-Tab.CreateButton = Tab.AddButton
 
 -- TOGGLE
-function Tab:AddToggle(config)
+function Card:CreateToggle(config)
 	config = config or {}
-	local row = self:CreateBaseRow(config.Title or "Toggle", config.Description)
+	local title = config.Title or "Toggle"
+	local desc = config.Description
 	local state = config.Default or false
 	local cb = config.Callback or function() end
 	
-	local badge = Create("TextLabel", {
-		BackgroundColor3 = state and Theme.ToggleOn or Theme.ToggleOff,
-		Text = state and "ON" or "OFF",
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 10,
+	local h = desc and 44 or 34
+	local frame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
+		Size = UDim2.new(1, 0, 0, h),
+		Parent = self.Container,
+	})
+	AddCorner(frame, 6)
+	AddStroke(frame, Theme.Border, 1)
+	
+	Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = title,
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 12, 0, desc and 6 or 0),
+		Size = UDim2.new(1, -65, 0, desc and 16 or h),
+		Parent = frame,
+	})
+	
+	if desc then
+		Create("TextLabel", {
+			BackgroundTransparency = 1,
+			Text = desc,
+			TextColor3 = Theme.TextMuted,
+			Font = Enum.Font.Gotham,
+			TextSize = 11,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Position = UDim2.new(0, 12, 0, 22),
+			Size = UDim2.new(1, -65, 0, 16),
+			Parent = frame,
+		})
+	end
+	
+	-- Capsule Switch
+	local track = Create("TextButton", {
+		Text = "",
+		BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.new(0, 36, 0, 18),
-		Parent = row.Frame,
+		Size = UDim2.new(0, 38, 0, 20),
+		AutoButtonColor = false,
+		Parent = frame,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = badge })
+	AddCorner(track, 10)
 	
-	row.Type = "Toggle"
-	row.Value = state
-	function row:Set(val)
+	local knob = Create("Frame", {
+		BackgroundColor3 = Theme.ToggleKnob,
+		Position = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
+		Size = UDim2.new(0, 16, 0, 16),
+		Parent = track,
+	})
+	AddCorner(knob, 8)
+	
+	local toggleObj = { Type = "Toggle", Value = state }
+	function toggleObj:Set(val)
 		state = val
 		self.Value = val
-		badge.Text = state and "ON" or "OFF"
-		Tween(badge, { BackgroundColor3 = state and Theme.ToggleOn or Theme.ToggleOff }, 0.15)
+		if state then
+			Tween(track, { BackgroundColor3 = Theme.Accent }, 0.2)
+			Tween(knob, { Position = UDim2.new(1, -18, 0.5, -8) }, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		else
+			Tween(track, { BackgroundColor3 = Theme.ToggleOff }, 0.2)
+			Tween(knob, { Position = UDim2.new(0, 2, 0.5, -8) }, 0.2)
+		end
 		task.spawn(cb, state)
 	end
-	function row:OnActivate() self:Set(not state) end
-	function row:OnLeft() self:Set(false) end
-	function row:OnRight() self:Set(true) end
 	
-	if config.Flag then Vanta.Flags[config.Flag] = row end
-	return row
+	track.MouseButton1Click:Connect(function()
+		toggleObj:Set(not state)
+	end)
+	
+	if config.Flag then Vanta.Flags[config.Flag] = toggleObj end
+	table.insert(self.Rows, { Title = title, Frame = frame })
+	return toggleObj
 end
-Tab.CreateToggle = Tab.AddToggle
 
 -- SLIDER
-function Tab:AddSlider(config)
+function Card:CreateSlider(config)
 	config = config or {}
-	local row = self:CreateBaseRow(config.Title or "Slider", config.Description)
+	local title = config.Title or "Slider"
 	local min = config.Min or 0
 	local max = config.Max or 100
 	local cur = config.Default or min
@@ -1022,223 +1237,528 @@ function Tab:AddSlider(config)
 	local sfx = config.Suffix or ""
 	local cb = config.Callback or function() end
 	
+	local frame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
+		Size = UDim2.new(1, 0, 0, 48),
+		Parent = self.Container,
+	})
+	AddCorner(frame, 6)
+	AddStroke(frame, Theme.Border, 1)
+	
+	Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = title,
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 12, 0, 6),
+		Size = UDim2.new(1, -90, 0, 16),
+		Parent = frame,
+	})
+	
 	local valLbl = Create("TextLabel", {
 		BackgroundTransparency = 1,
-		Text = "< " .. tostring(cur) .. sfx .. " >",
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Text = tostring(cur) .. sfx,
+		TextColor3 = Theme.Accent,
 		Font = Enum.Font.GothamBold,
-		TextSize = 11,
+		TextSize = 12,
 		TextXAlignment = Enum.TextXAlignment.Right,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.new(0, 80, 1, 0),
-		Parent = row.Frame,
+		Position = UDim2.new(1, -90, 0, 6),
+		Size = UDim2.new(0, 78, 0, 16),
+		Parent = frame,
 	})
 	
-	row.Type = "Slider"
-	row.Value = cur
-	function row:Set(val)
-		cur = math.clamp(val, min, max)
-		self.Value = cur
-		valLbl.Text = "< " .. tostring(cur) .. sfx .. " >"
-		task.spawn(cb, cur)
-	end
-	function row:OnLeft() self:Set(cur - step) end
-	function row:OnRight() self:Set(cur + step) end
-	function row:OnActivate() if cur >= max then self:Set(min) else self:Set(cur + step) end end
+	local track = Create("TextButton", {
+		Text = "",
+		BackgroundColor3 = Theme.ToggleOff,
+		Position = UDim2.new(0, 12, 0, 30),
+		Size = UDim2.new(1, -24, 0, 6),
+		AutoButtonColor = false,
+		Parent = frame,
+	})
+	AddCorner(track, 3)
 	
-	if config.Flag then Vanta.Flags[config.Flag] = row end
-	return row
+	local fill = Create("Frame", {
+		BackgroundColor3 = Theme.Accent,
+		Size = UDim2.new(math.clamp((cur - min) / (max - min), 0, 1), 0, 1, 0),
+		Parent = track,
+	})
+	AddCorner(fill, 3)
+	
+	local sliderObj = { Type = "Slider", Value = cur }
+	local function updateSlider(xPos)
+		local w = track.AbsoluteSize.X
+		local relX = math.clamp(xPos - track.AbsolutePosition.X, 0, w)
+		local raw = min + (max - min) * (relX / w)
+		local stepped = math.floor((raw / step) + 0.5) * step
+		stepped = math.clamp(stepped, min, max)
+		sliderObj:Set(stepped)
+	end
+	
+	function sliderObj:Set(val)
+		val = math.clamp(val, min, max)
+		cur = val
+		self.Value = val
+		valLbl.Text = tostring(val) .. sfx
+		Tween(fill, { Size = UDim2.new((val - min) / (max - min), 0, 1, 0) }, 0.08)
+		task.spawn(cb, val)
+	end
+	
+	local dragging = false
+	track.InputBegan:Connect(function(inp)
+		if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			updateSlider(inp.Position.X)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(inp)
+		if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(inp)
+		if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+			updateSlider(inp.Position.X)
+		end
+	end)
+	
+	if config.Flag then Vanta.Flags[config.Flag] = sliderObj end
+	table.insert(self.Rows, { Title = title, Frame = frame })
+	return sliderObj
 end
-Tab.CreateSlider = Tab.AddSlider
 
--- DROPDOWN
-function Tab:AddDropdown(config)
+-- DROPDOWN (FLOATING OVERLAY POPUP)
+function Card:CreateDropdown(config)
 	config = config or {}
-	local row = self:CreateBaseRow(config.Title or "Dropdown", config.Description)
-	local opts = config.Options or { "Option" }
-	local curIdx = table.find(opts, config.Default) or 1
+	local title = config.Title or "Dropdown"
+	local opts = config.Options or { "Option 1" }
+	local cur = config.Default or opts[1]
+	local multi = config.Multi or false
 	local cb = config.Callback or function() end
 	
-	local choiceLbl = Create("TextLabel", {
+	local selected = multi and (type(cur) == "table" and cur or {cur}) or cur
+	local isOpen = false
+	
+	local frame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
+		Size = UDim2.new(1, 0, 0, 40),
+		Parent = self.Container,
+	})
+	AddCorner(frame, 6)
+	AddStroke(frame, Theme.Border, 1)
+	
+	Create("TextLabel", {
 		BackgroundTransparency = 1,
-		Text = "< " .. tostring(opts[curIdx] or "None") .. " >",
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		Font = Enum.Font.GothamBold,
-		TextSize = 11,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.new(0, 110, 1, 0),
-		Parent = row.Frame,
+		Text = title,
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(0.45, 0, 1, 0),
+		Parent = frame,
 	})
 	
-	row.Type = "Dropdown"
-	row.Value = opts[curIdx]
-	function row:Set(val)
-		local idx = table.find(opts, val)
-		if idx then
-			curIdx = idx
-			self.Value = val
-			choiceLbl.Text = "< " .. tostring(val) .. " >"
-			task.spawn(cb, val)
+	local valBtn = Create("TextButton", {
+		BackgroundColor3 = Theme.Card,
+		Size = UDim2.new(0.5, 0, 0, 26),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -10, 0.5, 0),
+		Text = "",
+		AutoButtonColor = false,
+		Parent = frame,
+	})
+	AddCorner(valBtn, 4)
+	AddStroke(valBtn, Theme.Border, 1)
+	
+	local dispLbl = Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = multi and table.concat(selected, ", ") or tostring(selected or "None"),
+		TextColor3 = Theme.TextMuted,
+		Font = Enum.Font.Gotham,
+		TextSize = 11,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 8, 0, 0),
+		Size = UDim2.new(1, -24, 1, 0),
+		Parent = valBtn,
+	})
+	
+	local chevron = Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = "▼",
+		TextColor3 = Theme.TextDark,
+		Font = Enum.Font.GothamBold,
+		TextSize = 9,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -6, 0.5, 0),
+		Size = UDim2.new(0, 12, 0, 12),
+		Parent = valBtn,
+	})
+	
+	-- Floating Menu on Overlay Layer
+	local menu = Create("ScrollingFrame", {
+		BackgroundColor3 = Theme.Card,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 2,
+		ScrollBarImageColor3 = Theme.BorderLight,
+		Size = UDim2.new(0, 180, 0, 0),
+		Visible = false,
+		CanvasSize = UDim2.new(0, 0, 0, 0),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		Parent = Vanta.Overlay,
+	})
+	AddCorner(menu, 6)
+	AddStroke(menu, Theme.Border, 1)
+	AddShadow(menu, 12)
+	Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4), Parent = menu })
+	Create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6), Parent = menu })
+	
+	local dropObj = { Type = "Dropdown", Value = selected, Options = opts }
+	function dropObj:Set(newVal)
+		selected = newVal
+		self.Value = newVal
+		dispLbl.Text = multi and table.concat(selected, ", ") or tostring(selected or "None")
+		task.spawn(cb, newVal)
+	end
+	
+	local function rebuildMenu()
+		for _, child in ipairs(menu:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
+		end
+		for _, opt in ipairs(opts) do
+			local optBtn = Create("TextButton", {
+				Text = opt,
+				TextColor3 = Theme.TextMuted,
+				Font = Enum.Font.Gotham,
+				TextSize = 11,
+				BackgroundColor3 = Theme.Input,
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 0, 24),
+				AutoButtonColor = false,
+				Parent = menu,
+			})
+			AddCorner(optBtn, 4)
+			optBtn.MouseEnter:Connect(function() Tween(optBtn, { BackgroundTransparency = 0.8, BackgroundColor3 = Theme.Accent, TextColor3 = Theme.Text }, 0.1) end)
+			optBtn.MouseLeave:Connect(function() Tween(optBtn, { BackgroundTransparency = 1, TextColor3 = Theme.TextMuted }, 0.1) end)
+			optBtn.MouseButton1Click:Connect(function()
+				if multi then
+					local idx = table.find(selected, opt)
+					if idx then table.remove(selected, idx) else table.insert(selected, opt) end
+					dropObj:Set(selected)
+				else
+					dropObj:Set(opt)
+					isOpen = false
+					menu.Visible = false
+				end
+			end)
 		end
 	end
-	function row:OnLeft()
-		curIdx = curIdx - 1
-		if curIdx < 1 then curIdx = #opts end
-		self:Set(opts[curIdx])
-	end
-	function row:OnRight()
-		curIdx = curIdx + 1
-		if curIdx > #opts then curIdx = 1 end
-		self:Set(opts[curIdx])
-	end
-	function row:OnActivate() self:OnRight() end
+	rebuildMenu()
 	
-	if config.Flag then Vanta.Flags[config.Flag] = row end
-	return row
+	valBtn.MouseButton1Click:Connect(function()
+		isOpen = not isOpen
+		if isOpen then
+			local abs = valBtn.AbsolutePosition
+			local sz = valBtn.AbsoluteSize
+			menu.Position = UDim2.new(0, abs.X, 0, abs.Y + sz.Y + 4)
+			menu.Size = UDim2.new(0, sz.X, 0, math.min(#opts * 28 + 12, 140))
+			menu.Visible = true
+		else
+			menu.Visible = false
+		end
+	end)
+	
+	if config.Flag then Vanta.Flags[config.Flag] = dropObj end
+	table.insert(self.Rows, { Title = title, Frame = frame })
+	return dropObj
 end
-Tab.CreateDropdown = Tab.AddDropdown
 
 -- COLORPICKER
-function Tab:AddColorPicker(config)
+function Card:CreateColorPicker(config)
 	config = config or {}
-	local row = self:CreateBaseRow(config.Title or "Color", config.Description)
-	local curCol = config.Default or Color3.fromRGB(255, 255, 255)
+	local title = config.Title or "Color"
+	local cur = config.Default or Color3.fromRGB(0, 210, 255)
 	local cb = config.Callback or function() end
+	local isOpen = false
 	
-	local swatch = Create("Frame", {
-		BackgroundColor3 = curCol,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -14, 0.5, 0),
-		Size = UDim2.new(0, 24, 0, 14),
-		Parent = row.Frame,
+	local frame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
+		Size = UDim2.new(1, 0, 0, 36),
+		Parent = self.Container,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 3), Parent = swatch })
-	Create("UIStroke", { Color = Color3.fromRGB(255, 255, 255), Thickness = 1, Parent = swatch })
+	AddCorner(frame, 6)
+	AddStroke(frame, Theme.Border, 1)
 	
-	local palette = {
-		Color3.fromRGB(255, 75, 75),
-		Color3.fromRGB(255, 165, 0),
-		Color3.fromRGB(255, 235, 59),
-		Color3.fromRGB(76, 175, 80),
-		Color3.fromRGB(0, 168, 255),
+	Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = title,
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(1, -70, 1, 0),
+		Parent = frame,
+	})
+	
+	local swatch = Create("TextButton", {
+		Text = "",
+		BackgroundColor3 = cur,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.new(0, 32, 0, 20),
+		AutoButtonColor = false,
+		Parent = frame,
+	})
+	AddCorner(swatch, 4)
+	AddStroke(swatch, Color3.fromRGB(255, 255, 255), 1)
+	
+	-- Preset Palette Modal
+	local palette = Create("Frame", {
+		BackgroundColor3 = Theme.Card,
+		Size = UDim2.new(0, 180, 0, 90),
+		Visible = false,
+		Parent = Vanta.Overlay,
+	})
+	AddCorner(palette, 8)
+	AddStroke(palette, Theme.Border, 1)
+	AddShadow(palette, 12)
+	
+	local pGrid = Create("Frame", {
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 10, 0, 10),
+		Size = UDim2.new(1, -20, 1, -20),
+		Parent = palette,
+	})
+	Create("UIGridLayout", { CellSize = UDim2.new(0, 34, 0, 28), CellPadding = UDim2.new(0, 8, 0, 8), Parent = pGrid })
+	
+	local presets = {
+		Color3.fromRGB(0, 210, 255),
+		Color3.fromRGB(16, 185, 129),
 		Color3.fromRGB(168, 85, 247),
+		Color3.fromRGB(244, 63, 94),
+		Color3.fromRGB(245, 158, 11),
 		Color3.fromRGB(255, 255, 255),
+		Color3.fromRGB(200, 200, 200),
+		Color3.fromRGB(40, 45, 55),
 	}
-	local pIdx = 1
-	row.Type = "ColorPicker"
-	row.Value = curCol
-	function row:Set(col)
-		curCol = col
-		self.Value = col
-		swatch.BackgroundColor3 = col
-		task.spawn(cb, col)
-	end
-	function row:OnActivate()
-		pIdx = pIdx + 1
-		if pIdx > #palette then pIdx = 1 end
-		self:Set(palette[pIdx])
-	end
-	row.OnRight = row.OnActivate
-	function row:OnLeft()
-		pIdx = pIdx - 1
-		if pIdx < 1 then pIdx = #palette end
-		self:Set(palette[pIdx])
+	
+	local colObj = { Type = "ColorPicker", Value = cur }
+	function colObj:Set(newCol)
+		cur = newCol
+		self.Value = newCol
+		swatch.BackgroundColor3 = newCol
+		task.spawn(cb, newCol)
 	end
 	
-	if config.Flag then Vanta.Flags[config.Flag] = row end
-	return row
+	for _, c in ipairs(presets) do
+		local pBtn = Create("TextButton", { Text = "", BackgroundColor3 = c, AutoButtonColor = false, Parent = pGrid })
+		AddCorner(pBtn, 4)
+		pBtn.MouseButton1Click:Connect(function()
+			colObj:Set(c)
+			palette.Visible = false
+			isOpen = false
+		end)
+	end
+	
+	swatch.MouseButton1Click:Connect(function()
+		isOpen = not isOpen
+		if isOpen then
+			local abs = swatch.AbsolutePosition
+			palette.Position = UDim2.new(0, abs.X - 148, 0, abs.Y + 26)
+			palette.Visible = true
+		else
+			palette.Visible = false
+		end
+	end)
+	
+	if config.Flag then Vanta.Flags[config.Flag] = colObj end
+	table.insert(self.Rows, { Title = title, Frame = frame })
+	return colObj
 end
-Tab.CreateColorPicker = Tab.AddColorPicker
 
 -- KEYBIND
-function Tab:AddKeybind(config)
+function Card:CreateKeybind(config)
 	config = config or {}
-	local row = self:CreateBaseRow(config.Title or "Keybind", config.Description)
-	local curKey = config.Default or Enum.KeyCode.E
-	local listening = false
+	local title = config.Title or "Keybind"
+	local cur = config.Default or Enum.KeyCode.E
 	local cb = config.Callback or function() end
+	local listening = false
 	
-	local keyLbl = Create("TextLabel", {
+	local frame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
+		Size = UDim2.new(1, 0, 0, 36),
+		Parent = self.Container,
+	})
+	AddCorner(frame, 6)
+	AddStroke(frame, Theme.Border, 1)
+	
+	Create("TextLabel", {
 		BackgroundTransparency = 1,
-		Text = "[" .. (curKey and curKey.Name or "NONE") .. "]",
+		Text = title,
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(1, -80, 1, 0),
+		Parent = frame,
+	})
+	
+	local bindBtn = Create("TextButton", {
+		Text = cur and "[" .. cur.Name .. "]" or "[None]",
 		TextColor3 = Theme.Accent,
 		Font = Enum.Font.GothamBold,
 		TextSize = 11,
-		TextXAlignment = Enum.TextXAlignment.Right,
+		BackgroundColor3 = Theme.Card,
+		Size = UDim2.new(0, 65, 0, 22),
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.new(0, 60, 1, 0),
-		Parent = row.Frame,
+		AutoButtonColor = false,
+		Parent = frame,
 	})
+	AddCorner(bindBtn, 4)
+	AddStroke(bindBtn, Theme.Border, 1)
 	
-	row.Type = "Keybind"
-	row.Value = curKey
-	function row:SetKey(k)
-		curKey = k
+	local keyObj = { Type = "Keybind", Value = cur }
+	function keyObj:SetKey(k)
+		cur = k
 		self.Value = k
-		keyLbl.Text = "[" .. (k and k.Name or "NONE") .. "]"
-	end
-	function row:OnActivate()
-		listening = true
-		keyLbl.Text = "[...]"
+		bindBtn.Text = k and "[" .. k.Name .. "]" or "[None]"
 	end
 	
-	UserInputService.InputBegan:Connect(function(input, gpe)
-		if listening and input.UserInputType == Enum.UserInputType.Keyboard then
+	bindBtn.MouseButton1Click:Connect(function()
+		listening = true
+		bindBtn.Text = "[...]"
+	end)
+	
+	UserInputService.InputBegan:Connect(function(inp, gpe)
+		if listening and inp.UserInputType == Enum.UserInputType.Keyboard then
 			listening = false
-			if input.KeyCode == Enum.KeyCode.Escape then
-				row:SetKey(nil)
+			if inp.KeyCode == Enum.KeyCode.Escape then
+				keyObj:SetKey(nil)
 			else
-				row:SetKey(input.KeyCode)
+				keyObj:SetKey(inp.KeyCode)
 			end
 			return
 		end
-		if not gpe and curKey and input.KeyCode == curKey then
+		if not gpe and cur and inp.KeyCode == cur then
 			task.spawn(cb, true)
 		end
 	end)
 	
-	if config.Flag then Vanta.Flags[config.Flag] = row end
-	return row
+	if config.Flag then Vanta.Flags[config.Flag] = keyObj end
+	table.insert(self.Rows, { Title = title, Frame = frame })
+	return keyObj
 end
-Tab.CreateKeybind = Tab.AddKeybind
 
 -- INPUT
-function Tab:AddInput(config)
+function Card:CreateInput(config)
 	config = config or {}
-	local row = self:CreateBaseRow(config.Title or "Input", config.Description)
+	local title = config.Title or "Input"
+	local def = config.Default or ""
 	local cb = config.Callback or function() end
 	
+	local frame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
+		Size = UDim2.new(1, 0, 0, 38),
+		Parent = self.Container,
+	})
+	AddCorner(frame, 6)
+	AddStroke(frame, Theme.Border, 1)
+	
+	Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = title,
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.new(0, 12, 0, 0),
+		Size = UDim2.new(0.45, 0, 1, 0),
+		Parent = frame,
+	})
+	
+	local tbBg = Create("Frame", {
+		BackgroundColor3 = Theme.Card,
+		Size = UDim2.new(0.5, 0, 0, 26),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -10, 0.5, 0),
+		Parent = frame,
+	})
+	AddCorner(tbBg, 4)
+	AddStroke(tbBg, Theme.Border, 1)
+	
 	local tb = Create("TextBox", {
-		BackgroundColor3 = Theme.Header,
-		PlaceholderText = config.Placeholder or "Enter...",
+		BackgroundTransparency = 1,
+		PlaceholderText = config.Placeholder or "Type...",
 		PlaceholderColor3 = Theme.TextDark,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextColor3 = Theme.Text,
 		Font = Enum.Font.Gotham,
 		TextSize = 11,
-		Text = config.Default or "",
+		Text = def,
 		ClearTextOnFocus = false,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.new(0, 90, 0, 20),
-		Parent = row.Frame,
+		Position = UDim2.new(0, 8, 0, 0),
+		Size = UDim2.new(1, -16, 1, 0),
+		Parent = tbBg,
 	})
-	Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = tb })
 	
-	row.Type = "Input"
-	row.Value = config.Default or ""
-	function row:OnActivate() tb:CaptureFocus() end
+	local inObj = { Type = "Input", Value = def }
 	tb.FocusLost:Connect(function()
-		row.Value = tb.Text
+		inObj.Value = tb.Text
 		task.spawn(cb, tb.Text)
 	end)
 	
-	if config.Flag then Vanta.Flags[config.Flag] = row end
-	return row
+	if config.Flag then Vanta.Flags[config.Flag] = inObj end
+	table.insert(self.Rows, { Title = title, Frame = frame })
+	return inObj
 end
-Tab.CreateInput = Tab.AddInput
+
+-- PARAGRAPH
+function Card:CreateParagraph(config)
+	config = config or {}
+	local title = config.Title or "Info"
+	local content = config.Content or ""
+	
+	local frame = Create("Frame", {
+		BackgroundColor3 = Theme.Input,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Parent = self.Container,
+	})
+	AddCorner(frame, 6)
+	AddStroke(frame, Theme.Border, 1)
+	Create("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), Parent = frame })
+	Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4), Parent = frame })
+	
+	Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = title,
+		TextColor3 = Theme.Text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, 0, 0, 16),
+		Parent = frame,
+	})
+	
+	Create("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = content,
+		TextColor3 = Theme.TextMuted,
+		Font = Enum.Font.Gotham,
+		TextSize = 11,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Parent = frame,
+	})
+	
+	table.insert(self.Rows, { Title = title, Frame = frame })
+	return frame
+end
 
 return Vanta
