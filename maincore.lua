@@ -413,25 +413,26 @@ function Aesthetic:CreateWindow(windowConfig)
 		Parent = sidebar,
 	})
 
-	local logoBox = Create("Frame", {
+	local logoBox = Create("TextButton", {
 		Name = "LogoBox",
 		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
 		Position = UDim2.new(0, 0, 0.5, -16),
 		Size = UDim2.new(0, 32, 0, 32),
-		Parent = brandBox,
-	})
-	AddCorner(logoBox, 6)
-
-	Create("TextLabel", {
-		BackgroundTransparency = 1,
 		Text = logoGlyph,
 		TextColor3 = Color3.fromRGB(12, 13, 16),
 		Font = Fonts.Bold,
 		TextSize = 20,
-		Position = UDim2.new(0, 0, 0, -1),
-		Size = UDim2.new(1, 0, 1, 0),
-		Parent = logoBox,
+		AutoButtonColor = false,
+		Parent = brandBox,
 	})
+	AddCorner(logoBox, 6)
+
+	logoBox.MouseEnter:Connect(function()
+		Tween(logoBox, { BackgroundColor3 = Color3.fromRGB(235, 235, 240) }, 0.1)
+	end)
+	logoBox.MouseLeave:Connect(function()
+		Tween(logoBox, { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }, 0.1)
+	end)
 
 	local brandTitleLbl = Create("TextLabel", {
 		BackgroundTransparency = 1,
@@ -512,6 +513,7 @@ function Aesthetic:CreateWindow(windowConfig)
 		Position = UDim2.new(0, 12, 1, -34),
 		Size = UDim2.new(1, -24, 0, 24),
 		AutoButtonColor = false,
+		ZIndex = 5,
 		Parent = sidebar,
 	})
 
@@ -523,8 +525,16 @@ function Aesthetic:CreateWindow(windowConfig)
 		TextSize = 11,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		Size = UDim2.new(1, 0, 1, 0),
+		ZIndex = 5,
 		Parent = collapseBtn,
 	})
+
+	collapseBtn.MouseEnter:Connect(function()
+		Tween(collapseLbl, { TextColor3 = Colors.Text }, 0.12)
+	end)
+	collapseBtn.MouseLeave:Connect(function()
+		Tween(collapseLbl, { TextColor3 = Colors.TextDark }, 0.12)
+	end)
 
 	-------------------------------------------------------------
 	-- 2. VERTICAL 1PX HAIRLINE DIVIDER
@@ -709,7 +719,7 @@ function Aesthetic:CreateWindow(windowConfig)
 		Parent = userDetails,
 	})
 	Create("UIListLayout", {
-		FillDirection = Enum.FillDirection.LeftToRight,
+		FillDirection = Enum.FillDirection.Horizontal,
 		HorizontalAlignment = Enum.HorizontalAlignment.Right,
 		VerticalAlignment = Enum.VerticalAlignment.Center,
 		Padding = UDim.new(0, 6),
@@ -852,23 +862,44 @@ function Aesthetic:CreateWindow(windowConfig)
 		end
 	end)
 
-	-- Sidebar collapse logic
-	collapseBtn.MouseButton1Click:Connect(function()
-		Window.IsCollapsed = not Window.IsCollapsed
-		if Window.IsCollapsed then
+	-- Sidebar fold / collapse logic
+	local function setFolded(folded)
+		Window.IsCollapsed = folded
+		if folded then
 			Tween(sidebar, { Size = UDim2.new(0, 52, 1, 0) }, 0.2)
 			verticalDivider.Position = UDim2.new(0, 52, 0, 0)
 			topbar.Position = UDim2.new(0, 53, 0, 0)
 			topbar.Size = UDim2.new(1, -53, 0, 52)
 			contentWorkspace.Position = UDim2.new(0, 68, 0, 62)
 			contentWorkspace.Size = UDim2.new(1, -84, 1, -72)
-			collapseLbl.Text = "⇥"
+
 			brandTitleLbl.Visible = false
 			brandSubLbl.Visible = false
-			sectionsHeader.Visible = false
+			settingsGear.Visible = false
+
+			brandBox.Position = UDim2.new(0, 0, 0, 10)
+			brandBox.Size = UDim2.new(1, 0, 0, 36)
+			logoBox.Position = UDim2.new(0.5, -16, 0.5, -16)
+
+			sectionsHeader.Text = "CORE"
+			sectionsHeader.TextXAlignment = Enum.TextXAlignment.Center
+			sectionsHeader.Position = UDim2.new(0, 0, 0, 58)
+			sectionsHeader.Size = UDim2.new(1, 0, 0, 16)
+			sectionsHeader.Visible = true
+
+			tabList.Position = UDim2.new(0, 6, 0, 78)
+			tabList.Size = UDim2.new(1, -12, 1, -120)
 			for _, t in ipairs(Window.Tabs) do
 				t.Label.Visible = false
+				t.Icon.Position = UDim2.new(0, 0, 0, 0)
+				t.Icon.Size = UDim2.new(1, 0, 1, 0)
+				t.Icon.TextXAlignment = Enum.TextXAlignment.Center
 			end
+
+			collapseBtn.Position = UDim2.new(0, 6, 1, -34)
+			collapseBtn.Size = UDim2.new(1, -12, 0, 24)
+			collapseLbl.Text = "⇥"
+			collapseLbl.TextXAlignment = Enum.TextXAlignment.Center
 		else
 			Tween(sidebar, { Size = UDim2.new(0, 185, 1, 0) }, 0.2)
 			verticalDivider.Position = UDim2.new(0, 185, 0, 0)
@@ -876,15 +907,52 @@ function Aesthetic:CreateWindow(windowConfig)
 			topbar.Size = UDim2.new(1, -186, 0, 52)
 			contentWorkspace.Position = UDim2.new(0, 202, 0, 62)
 			contentWorkspace.Size = UDim2.new(1, -218, 1, -72)
-			collapseLbl.Text = "⇤  Collapse sidebar"
+
 			brandTitleLbl.Visible = true
 			brandSubLbl.Visible = true
+			settingsGear.Visible = true
+
+			brandBox.Position = UDim2.new(0, 14, 0, 10)
+			brandBox.Size = UDim2.new(1, -28, 0, 36)
+			logoBox.Position = UDim2.new(0, 0, 0.5, -16)
+
+			sectionsHeader.Text = "SECTIONS"
+			sectionsHeader.TextXAlignment = Enum.TextXAlignment.Left
+			sectionsHeader.Position = UDim2.new(0, 16, 0, 58)
+			sectionsHeader.Size = UDim2.new(1, -32, 0, 16)
 			sectionsHeader.Visible = true
+
+			tabList.Position = UDim2.new(0, 10, 0, 78)
+			tabList.Size = UDim2.new(1, -20, 1, -120)
 			for _, t in ipairs(Window.Tabs) do
 				t.Label.Visible = true
+				t.Icon.Position = UDim2.new(0, 10, 0, 0)
+				t.Icon.Size = UDim2.new(0, 20, 1, 0)
+				t.Icon.TextXAlignment = Enum.TextXAlignment.Center
 			end
+
+			collapseBtn.Position = UDim2.new(0, 12, 1, -34)
+			collapseBtn.Size = UDim2.new(1, -24, 0, 24)
+			collapseLbl.Text = "⇤  Collapse sidebar"
+			collapseLbl.TextXAlignment = Enum.TextXAlignment.Left
 		end
+	end
+
+	collapseBtn.MouseButton1Click:Connect(function()
+		setFolded(not Window.IsCollapsed)
 	end)
+	logoBox.MouseButton1Click:Connect(function()
+		setFolded(not Window.IsCollapsed)
+	end)
+
+	function Window:ToggleSidebar()
+		setFolded(not self.IsCollapsed)
+	end
+	Window.ToggleFold = Window.ToggleSidebar
+
+	function Window:Fold(val)
+		setFolded(val == true)
+	end
 
 	-- Keybind toggle
 	if toggleKey then
@@ -988,14 +1056,16 @@ function Aesthetic:CreateWindow(windowConfig)
 		})
 		AddCorner(tabBtn, 6)
 
+		local isFolded = Window.IsCollapsed
 		local iconLbl = Create("TextLabel", {
 			BackgroundTransparency = 1,
 			Text = tabIcon,
 			TextColor3 = Colors.TextMuted,
 			Font = Fonts.Bold,
 			TextSize = 15,
-			Position = UDim2.new(0, 10, 0, 0),
-			Size = UDim2.new(0, 20, 1, 0),
+			Position = isFolded and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 10, 0, 0),
+			Size = isFolded and UDim2.new(1, 0, 1, 0) or UDim2.new(0, 20, 1, 0),
+			TextXAlignment = Enum.TextXAlignment.Center,
 			Parent = tabBtn,
 		})
 
@@ -1847,6 +1917,10 @@ function Aesthetic:CreateWindow(windowConfig)
 		tabObj.CreateModule = tabObj.CreateCard
 
 		return tabObj
+	end
+
+	if windowConfig.Collapsed or windowConfig.Folded then
+		setFolded(true)
 	end
 
 	table.insert(Aesthetic.Windows, Window)
